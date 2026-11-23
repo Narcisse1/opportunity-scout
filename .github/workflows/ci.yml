@@ -10,8 +10,10 @@ jobs:
       matrix:
         python: ["3.10", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
       - run: uv venv --python ${{ matrix.python }}
       - run: uv pip install -e ".[dev]"
       - run: uv run ruff check .

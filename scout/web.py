@@ -87,10 +87,13 @@ def serialize_intel(report: IntelReport, today: date) -> dict[str, Any]:
         "competitors": [
             {
                 "name": c.competitor,
-                "pages": [{"label": p.label, "url": p.url, "status": p.status, "error": p.error}
-                          for p in c.pages],
-                "news": [{"url": d.url, "title": d.title, "published": d.published}
-                         for d in c.news],
+                "pages": [
+                    {"label": p.label, "url": p.url, "status": p.status, "error": p.error}
+                    for p in c.pages
+                ],
+                "news": [
+                    {"url": d.url, "title": d.title, "published": d.published} for d in c.news
+                ],
                 "findings": [f.model_dump() for f in c.findings],
                 "ungrounded_dropped": c.ungrounded_dropped,
                 "error": c.error,
@@ -124,8 +127,11 @@ def create_app(
         if key := env("EXA_API_KEY"):
             sources.append(ExaSource(key))
         if not sources:
-            raise HTTPException(400, "Live mode needs FIRECRAWL_API_KEY or EXA_API_KEY on the "
-                                     "server. Use the offline demo instead.")
+            raise HTTPException(
+                400,
+                "Live mode needs FIRECRAWL_API_KEY or EXA_API_KEY on the "
+                "server. Use the offline demo instead.",
+            )
         return MultiSource(sources), sources[0]
 
     get_live = live_sources or default_live_sources
@@ -182,8 +188,15 @@ def create_app(
 
         def work() -> dict[str, Any]:
             today = date.today()
-            scout = OpportunityScout(req.profile, search=search, fetcher=fetcher, llm=make_llm(),
-                                     store=run_store, min_score=req.min_score, draft=req.draft)
+            scout = OpportunityScout(
+                req.profile,
+                search=search,
+                fetcher=fetcher,
+                llm=make_llm(),
+                store=run_store,
+                min_score=req.min_score,
+                draft=req.draft,
+            )
             report = scout.run(req.queries, req.results_per_query, today=today)
             return serialize_scan(report, req.min_score, today)
 
@@ -201,9 +214,15 @@ def create_app(
             run_store = shared_store
 
         def work() -> dict[str, Any]:
-            monitor = IntelMonitor(req.competitors, fetcher=fetcher, llm=make_llm(),
-                                   store=run_store, news=news, profile=req.profile,
-                                   news_days=req.news_days)
+            monitor = IntelMonitor(
+                req.competitors,
+                fetcher=fetcher,
+                llm=make_llm(),
+                store=run_store,
+                news=news,
+                profile=req.profile,
+                news_days=req.news_days,
+            )
             return serialize_intel(monitor.run(), date.today())
 
         return submit("intel", work)

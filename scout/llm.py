@@ -137,6 +137,8 @@ class ClaudeLLM:
                 )
             except (TypeError, AttributeError) as exc:
                 # Older SDKs lack beta parse or the `fallbacks` parameter: degrade once, loudly.
-                log.warning("refusal fallbacks unavailable in this SDK (%s); continuing without", exc)
+                log.warning(
+                    "refusal fallbacks unavailable in this SDK (%s); continuing without", exc
+                )
                 self.use_fallbacks = False
         return self.client.messages.parse(**kwargs)

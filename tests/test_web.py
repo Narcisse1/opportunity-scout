@@ -18,15 +18,26 @@ from scout.store import Store
 from scout.web import create_app
 
 PROFILE = {"name": "Example Startup", "one_liner": "AI crop diagnosis", "country": "Cameroon"}
-RIVAL = {"name": "RivalAI", "news_query": "RivalAI",
-         "pages": {"pricing": "https://rival.example.com/pricing",
-                   "changelog": "https://rival.example.com/changelog"}}
+RIVAL = {
+    "name": "RivalAI",
+    "news_query": "RivalAI",
+    "pages": {
+        "pricing": "https://rival.example.com/pricing",
+        "changelog": "https://rival.example.com/changelog",
+    },
+}
 
 
 def fake_llm():
-    return FakeLLM({ExtractionResult: extraction_for, FitAssessment: fit_for,
-                    ApplicationDraft: draft_for, CompetitorAnalysis: analysis,
-                    IntelDigest: digest})
+    return FakeLLM(
+        {
+            ExtractionResult: extraction_for,
+            FitAssessment: fit_for,
+            ApplicationDraft: draft_for,
+            CompetitorAnalysis: analysis,
+            IntelDigest: digest,
+        }
+    )
 
 
 def client() -> TestClient:
@@ -51,9 +62,15 @@ def test_index_and_health():
 
 def test_offline_scan_job():
     c = client()
-    job = c.post("/api/opportunities/scan", json={
-        "profile": PROFILE, "queries": ["grant hackathon accelerator"], "offline": True,
-        "results_per_query": 10}).json()
+    job = c.post(
+        "/api/opportunities/scan",
+        json={
+            "profile": PROFILE,
+            "queries": ["grant hackathon accelerator"],
+            "offline": True,
+            "results_per_query": 10,
+        },
+    ).json()
     done = wait(c, job["id"])
     assert done["status"] == "done", done["error"]
     shortlisted = [o["name"] for o in done["result"]["opportunities"] if o["shortlisted"]]
@@ -74,7 +91,10 @@ def test_offline_intel_demo_detects_changes_between_weeks():
 
 def test_validation_and_limits():
     c = client()
-    assert c.post("/api/opportunities/scan", json={"profile": PROFILE, "queries": []}).status_code == 422
+    assert (
+        c.post("/api/opportunities/scan", json={"profile": PROFILE, "queries": []}).status_code
+        == 422
+    )
     too_many = {"profile": PROFILE, "queries": ["q"] * 11, "offline": True}
     assert c.post("/api/opportunities/scan", json=too_many).status_code == 422
     assert c.get("/api/jobs/nope").status_code == 404

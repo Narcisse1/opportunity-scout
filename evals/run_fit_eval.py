@@ -50,27 +50,44 @@ def main() -> int:
             {"url": None, "equity_taken": None, "application_questions": [], **case["opportunity"]}
         )
         for run in range(args.repeat):
-            fit = clamp_score(llm.structured(
-                system=system,
-                prompt=f"Today is {today.isoformat()}.\n\n<opportunity>\n"
-                       f"{opp.model_dump_json(indent=2)}\n</opportunity>",
-                schema=FitAssessment,
-            ))
+            fit = clamp_score(
+                llm.structured(
+                    system=system,
+                    prompt=f"Today is {today.isoformat()}.\n\n<opportunity>\n"
+                    f"{opp.model_dump_json(indent=2)}\n</opportunity>",
+                    schema=FitAssessment,
+                )
+            )
             ok = fit.verdict == case["expected"]
             confusion[(case["expected"], fit.verdict)] += 1
-            rows.append({"id": case["id"], "run": run, "expected": case["expected"],
-                         "got": fit.verdict, "score": fit.score, "ok": ok,
-                         "blockers": fit.eligibility_blockers})
-            print(f"{'PASS' if ok else 'FAIL'}  {case['id']:<26} expected={case['expected']:<10} "
-                  f"got={fit.verdict:<10} score={fit.score}")
+            rows.append(
+                {
+                    "id": case["id"],
+                    "run": run,
+                    "expected": case["expected"],
+                    "got": fit.verdict,
+                    "score": fit.score,
+                    "ok": ok,
+                    "blockers": fit.eligibility_blockers,
+                }
+            )
+            print(
+                f"{'PASS' if ok else 'FAIL'}  {case['id']:<26} expected={case['expected']:<10} "
+                f"got={fit.verdict:<10} score={fit.score}"
+            )
 
     total = len(rows)
     accuracy = sum(r["ok"] for r in rows) / total
     inel = [r for r in rows if r["expected"] == "ineligible"]
     inel_recall = sum(r["got"] == "ineligible" for r in inel) / len(inel) if inel else None
-    summary = {"model": args.model, "cases": total, "accuracy": round(accuracy, 3),
-               "ineligible_recall": inel_recall, "usage": llm.usage.summary(),
-               "confusion": {f"{e}->{g}": n for (e, g), n in sorted(confusion.items())}}
+    summary = {
+        "model": args.model,
+        "cases": total,
+        "accuracy": round(accuracy, 3),
+        "ineligible_recall": inel_recall,
+        "usage": llm.usage.summary(),
+        "confusion": {f"{e}->{g}": n for (e, g), n in sorted(confusion.items())},
+    }
     print(json.dumps(summary, indent=2))
 
     out = HERE / "results"

@@ -29,7 +29,9 @@ class Document:
 class SearchSource(Protocol):
     name: str
 
-    def search(self, query: str, limit: int = 5, since_days: int | None = None) -> list[Document]: ...
+    def search(
+        self, query: str, limit: int = 5, since_days: int | None = None
+    ) -> list[Document]: ...
 
 
 class Fetcher(Protocol):

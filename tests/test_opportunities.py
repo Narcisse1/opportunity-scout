@@ -74,8 +74,9 @@ def test_opportunity_key_is_case_insensitive():
 def test_clamp_score():
     fit = FitAssessment(score=140, verdict="strong", reasons=[], risks=[], eligibility_blockers=[])
     assert clamp_score(fit).score == 100
-    inel = FitAssessment(score=70, verdict="ineligible", reasons=[], risks=[],
-                         eligibility_blockers=["EU only"])
+    inel = FitAssessment(
+        score=70, verdict="ineligible", reasons=[], risks=[], eligibility_blockers=["EU only"]
+    )
     assert clamp_score(inel).score == 20
 
 
@@ -86,48 +87,79 @@ def extraction_for(_system: str, prompt: str) -> ExtractionResult:
     if "lumen-founders-grant" in prompt:
         return ExtractionResult(opportunities=[opp()])
     if "agentforge" in prompt:
-        return ExtractionResult(opportunities=[opp(
-            name="AgentForge Global Hackathon", organizer="AgentForge", type="hackathon",
-            url="https://example.org/agentforge-hackathon", deadline="2027-01-08",
-            funding_or_prize="$25,000", application_questions=[])])
+        return ExtractionResult(
+            opportunities=[
+                opp(
+                    name="AgentForge Global Hackathon",
+                    organizer="AgentForge",
+                    type="hackathon",
+                    url="https://example.org/agentforge-hackathon",
+                    deadline="2027-01-08",
+                    funding_or_prize="$25,000",
+                    application_questions=[],
+                )
+            ]
+        )
     if "northstar" in prompt:
-        return ExtractionResult(opportunities=[opp(
-            name="Northstar Accelerator", organizer="Northstar", type="accelerator",
-            deadline="2026-03-01")])
+        return ExtractionResult(
+            opportunities=[
+                opp(
+                    name="Northstar Accelerator",
+                    organizer="Northstar",
+                    type="accelerator",
+                    deadline="2026-03-01",
+                )
+            ]
+        )
     return ExtractionResult(opportunities=[])
 
 
 def fit_for(_system: str, prompt: str) -> FitAssessment:
     score = 85 if "Lumen" in prompt else 45
     verdict = "strong" if score >= 75 else "poor"
-    return FitAssessment(score=score, verdict=verdict, reasons=["matches sector"], risks=[],
-                         eligibility_blockers=[])
+    return FitAssessment(
+        score=score, verdict=verdict, reasons=["matches sector"], risks=[], eligibility_blockers=[]
+    )
 
 
 def draft_for(_system: str, prompt: str) -> ApplicationDraft:
     return ApplicationDraft(
-        answers=[DraftAnswer(question="What problem are you solving?",
-                             answer="Farmers lose crops to disease. [[NEEDS: yield data]]",
-                             needs_input=["yield data"])],
+        answers=[
+            DraftAnswer(
+                question="What problem are you solving?",
+                answer="Farmers lose crops to disease. [[NEEDS: yield data]]",
+                needs_input=["yield data"],
+            )
+        ],
         missing_info=["yield data"],
     )
 
 
 def make_llm():
-    return FakeLLM({ExtractionResult: extraction_for, FitAssessment: fit_for,
-                    ApplicationDraft: draft_for})
+    return FakeLLM(
+        {ExtractionResult: extraction_for, FitAssessment: fit_for, ApplicationDraft: draft_for}
+    )
 
 
 def make_scout(profile, llm, store):
     source = FixtureSource(FIXTURES / "opportunities")
-    return OpportunityScout(profile, search=source, fetcher=source, llm=llm, store=store,
-                            min_score=60, max_workers=2, min_content_chars=10)
+    return OpportunityScout(
+        profile,
+        search=source,
+        fetcher=source,
+        llm=llm,
+        store=store,
+        min_score=60,
+        max_workers=2,
+        min_content_chars=10,
+    )
 
 
 def test_pipeline_scores_filters_and_drafts(profile):
     llm, store = make_llm(), Store()
     report = make_scout(profile, llm, store).run(
-        ["grant accelerator hackathon AI"], results_per_query=10, today=TODAY)
+        ["grant accelerator hackathon AI"], results_per_query=10, today=TODAY
+    )
 
     names = {o.opportunity.name: o for o in report.opportunities}
     assert names["Northstar Accelerator"].rejected == ["deadline passed (2026-03-01)"]
@@ -182,8 +214,9 @@ def test_untrusted_content_is_wrapped(profile):
 
 
 def test_markdown_report(profile):
-    report = make_scout(profile, make_llm(), Store()).run(["grant hackathon accelerator"], 10,
-                                                          today=TODAY)
+    report = make_scout(profile, make_llm(), Store()).run(
+        ["grant hackathon accelerator"], 10, today=TODAY
+    )
     md = opportunities_markdown(report, 60, TODAY)
     assert md.startswith("---\ntype: opportunity-scan")
     assert "| 85 | [Lumen Founders Grant]" in md

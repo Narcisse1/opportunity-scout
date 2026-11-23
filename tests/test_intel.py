@@ -13,8 +13,10 @@ from scout.store import Store
 RIVAL = Competitor(
     name="RivalAI",
     news_query="RivalAI",
-    pages={"pricing": "https://rival.example.com/pricing",
-           "changelog": "https://rival.example.com/changelog"},
+    pages={
+        "pricing": "https://rival.example.com/pricing",
+        "changelog": "https://rival.example.com/changelog",
+    },
 )
 
 
@@ -41,27 +43,40 @@ def test_grounding():
 
 
 def finding(quote: str, url: str, summary: str = "x") -> ChangeFinding:
-    return ChangeFinding(category="pricing", summary=summary, evidence_quote=quote,
-                         source_url=url, importance="high")
+    return ChangeFinding(
+        category="pricing", summary=summary, evidence_quote=quote, source_url=url, importance="high"
+    )
 
 
 def analysis(_system, prompt):
-    return CompetitorAnalysis(findings=[
-        finding("$39 per month", "https://rival.example.com/pricing", "Starter up from $29 to $39"),
-        finding("Launched Grant Finder", "https://rival.example.com/changelog", "New grant agent"),
-        finding("$12M Series A", "https://news.example.com/rivalai-series-a", "Raised Series A"),
-        finding("acquired by MegaCorp", "https://rival.example.com/pricing", "hallucinated"),
-    ])
+    return CompetitorAnalysis(
+        findings=[
+            finding(
+                "$39 per month", "https://rival.example.com/pricing", "Starter up from $29 to $39"
+            ),
+            finding(
+                "Launched Grant Finder", "https://rival.example.com/changelog", "New grant agent"
+            ),
+            finding(
+                "$12M Series A", "https://news.example.com/rivalai-series-a", "Raised Series A"
+            ),
+            finding("acquired by MegaCorp", "https://rival.example.com/pricing", "hallucinated"),
+        ]
+    )
 
 
 def digest(_system, prompt):
-    return IntelDigest(headline="RivalAI is moving into grant discovery.",
-                       implications=["Direct overlap"], recommended_actions=["Ship faster"])
+    return IntelDigest(
+        headline="RivalAI is moving into grant discovery.",
+        implications=["Direct overlap"],
+        recommended_actions=["Ship faster"],
+    )
 
 
 def monitor(store, week, llm, news=None):
-    return IntelMonitor([RIVAL], fetcher=FixtureSource(FIXTURES / "intel" / week), llm=llm,
-                        store=store, news=news)
+    return IntelMonitor(
+        [RIVAL], fetcher=FixtureSource(FIXTURES / "intel" / week), llm=llm, store=store, news=news
+    )
 
 
 def test_first_run_is_baseline_without_llm_calls():
@@ -82,7 +97,10 @@ def test_changes_are_analysed_and_hallucinations_dropped():
 
     assert [p.status for p in comp.pages] == ["changed", "changed"]
     assert {f.summary for f in comp.findings} == {
-        "Starter up from $29 to $39", "New grant agent", "Raised Series A"}
+        "Starter up from $29 to $39",
+        "New grant agent",
+        "Raised Series A",
+    }
     assert comp.ungrounded_dropped == 1
     assert report.digest.headline.startswith("RivalAI")
 

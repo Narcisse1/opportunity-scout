@@ -1,8 +1,8 @@
 """Command line entry point.
 
-    scout opportunities --config scout.yaml --profile profile.yaml
-    scout intel         --config scout.yaml --profile profile.yaml
-    scout opportunities --offline        # demo on bundled fixtures (still calls Claude)
+scout opportunities --config scout.yaml --profile profile.yaml
+scout intel         --config scout.yaml --profile profile.yaml
+scout opportunities --offline        # demo on bundled fixtures (still calls Claude)
 """
 
 from __future__ import annotations
@@ -79,14 +79,25 @@ def cmd_opportunities(args: argparse.Namespace) -> int:
     )
     today = date.today()
     report = scout.run(
-        cfg.opportunities.queries, results_per_query=cfg.opportunities.results_per_query, today=today
+        cfg.opportunities.queries,
+        results_per_query=cfg.opportunities.results_per_query,
+        today=today,
     )
     shortlist = report.shortlist(cfg.opportunities.min_score)
     md = opportunities_markdown(report, cfg.opportunities.min_score, today)
-    publish(cfg, "Opportunities", f"{today.isoformat()} opportunities.md",
-            f"Opportunity scan {today.isoformat()} ({len(shortlist)} shortlisted)", md)
-    print(json.dumps({"shortlisted": len(shortlist), "errors": len(report.errors),
-                      "usage": report.usage}, indent=2))
+    publish(
+        cfg,
+        "Opportunities",
+        f"{today.isoformat()} opportunities.md",
+        f"Opportunity scan {today.isoformat()} ({len(shortlist)} shortlisted)",
+        md,
+    )
+    print(
+        json.dumps(
+            {"shortlisted": len(shortlist), "errors": len(report.errors), "usage": report.usage},
+            indent=2,
+        )
+    )
     return 0
 
 
@@ -113,8 +124,13 @@ def cmd_intel(args: argparse.Namespace) -> int:
     report = monitor.run()
     today = date.today()
     md = intel_markdown(report, today)
-    publish(cfg, "Competitor Intel", f"{today.isoformat()} competitor briefing.md",
-            f"Competitor briefing {today.isoformat()}", md)
+    publish(
+        cfg,
+        "Competitor Intel",
+        f"{today.isoformat()} competitor briefing.md",
+        f"Competitor briefing {today.isoformat()}",
+        md,
+    )
     print(json.dumps({"findings": len(report.findings), "usage": report.usage}, indent=2))
     return 0
 
@@ -129,8 +145,9 @@ def cmd_web(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
-    parser = argparse.ArgumentParser(prog="scout", description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        prog="scout", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -153,8 +170,10 @@ def main(argv: list[str] | None = None) -> int:
     p_web.set_defaults(func=cmd_web)
 
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING,
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO if args.verbose else logging.WARNING,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     return args.func(args)
 
 
