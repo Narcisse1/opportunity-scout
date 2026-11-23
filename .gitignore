@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+data/
+vault/
+scout.yaml
+profile.yaml
+evals/results/
+dist/

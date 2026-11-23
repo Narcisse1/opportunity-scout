@@ -1,0 +1,93 @@
+# Labeled cases for the fit-scoring step. Each case pairs one profile with one opportunity
+# and the verdict a careful human reviewer would give. Grow this file from real runs:
+# whenever you disagree with a verdict in a report, add the case here with your label.
+profile:
+  name: Example Startup
+  one_liner: AI assistant that diagnoses crop disease from a phone photo for smallholder farmers.
+  stage: pre-seed
+  sectors: [agritech, AI]
+  country: Cameroon
+  regions_served: [Central Africa]
+  founded_year: 2025
+  funding_raised: "$0"
+  traction: ["Pilot with 40 farmers"]
+  goals: [non-dilutive funding, cloud credits]
+
+cases:
+  - id: africa-agritech-grant
+    expected: strong
+    opportunity:
+      name: Harvest AI Grant
+      organizer: Example Foundation
+      type: grant
+      deadline: "2027-03-01"
+      funding_or_prize: "$40,000 non-dilutive"
+      location_requirements: "Startups headquartered in Sub-Saharan Africa"
+      stage_requirements: "Pre-seed or seed"
+      eligibility: ["Uses AI for agriculture or food security"]
+      summary: Grant for African startups applying AI to agriculture.
+
+  - id: eu-only-accelerator
+    expected: ineligible
+    opportunity:
+      name: Rhine AI Accelerator
+      organizer: Example Ventures
+      type: accelerator
+      deadline: "2027-02-01"
+      funding_or_prize: "$120,000 for 7% equity"
+      location_requirements: "Must be incorporated in an EU member state"
+      stage_requirements: "Seed"
+      eligibility: ["EU incorporation required", "In-person in Germany for 12 weeks"]
+      summary: Equity accelerator for EU-incorporated AI startups.
+
+  - id: series-b-only
+    expected: ineligible
+    opportunity:
+      name: Scale-Up Growth Program
+      organizer: Example Bank
+      type: accelerator
+      deadline: "2027-04-01"
+      funding_or_prize: "Up to $2M debt facility"
+      location_requirements: "Global"
+      stage_requirements: "Series B or later, $5M+ ARR"
+      eligibility: ["$5M+ annual recurring revenue"]
+      summary: Growth financing for late-stage companies.
+
+  - id: global-ai-hackathon
+    expected: possible
+    opportunity:
+      name: Open Agents Hackathon
+      organizer: Example Labs
+      type: hackathon
+      deadline: "2027-01-15"
+      funding_or_prize: "$10,000 prize pool"
+      location_requirements: "Online, worldwide"
+      stage_requirements: null
+      eligibility: ["Individuals or teams of up to 4"]
+      summary: Weekend online hackathon for AI agents in any domain.
+
+  - id: fintech-only-grant
+    expected: poor
+    opportunity:
+      name: Mobile Money Innovation Grant
+      organizer: Example Telco
+      type: grant
+      deadline: "2027-02-20"
+      funding_or_prize: "$15,000"
+      location_requirements: "Africa"
+      stage_requirements: "Any"
+      eligibility: ["Product must be a payments or lending product"]
+      summary: Grant for fintech products built on mobile money.
+
+  - id: unclear-region-credits
+    expected: possible
+    opportunity:
+      name: Example Cloud Startup Credits
+      organizer: Example Cloud
+      type: credits
+      deadline: null
+      funding_or_prize: "$25,000 in cloud credits"
+      location_requirements: "Available in supported countries (list not published)"
+      stage_requirements: "Pre-Series A"
+      eligibility: ["Must have a company website"]
+      summary: Rolling cloud-credit program for early-stage startups.

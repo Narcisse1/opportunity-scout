@@ -1,0 +1,28 @@
+# Copy to scout.yaml and edit.
+model: claude-opus-5-5
+database: ./data/scout.db
+max_workers: 4
+
+opportunities:
+  min_score: 60            # shortlist threshold (0-100)
+  results_per_query: 5
+  draft_applications: true
+  queries:
+    - "AI startup grant applications open 2027"
+    - "pre-seed accelerator applications open Africa AI startups"
+    - "AI agents hackathon 2027 prize registration"
+    - "non-dilutive funding healthtech startups Africa 2027"
+    - "AI cloud credits program startups apply"
+
+intel:
+  news_days: 7
+  competitors:
+    - name: RivalAI                      # fictional: matches the offline fixtures
+      news_query: "RivalAI"
+      pages:
+        pricing: https://rival.example.com/pricing
+        changelog: https://rival.example.com/changelog
+
+output:
+  obsidian_vault: ./vault   # point this at your real Obsidian vault folder
+  notion: false             # true + NOTION_TOKEN + NOTION_DATABASE_ID to also publish there

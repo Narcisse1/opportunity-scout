@@ -1,0 +1,41 @@
+name: scheduled-scout
+# Runs both agents on a schedule. Needs repository secrets ANTHROPIC_API_KEY and
+# FIRECRAWL_API_KEY and/or EXA_API_KEY (optional: NOTION_TOKEN, NOTION_DATABASE_ID), plus
+# committed scout.yaml / profile.yaml or the SCOUT_CONFIG / SCOUT_PROFILE secrets below.
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # opportunities + intel every Monday 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+      EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv --python 3.12 && uv pip install -e .
+      - name: Write config from secrets (if provided)
+        env:
+          SCOUT_CONFIG: ${{ secrets.SCOUT_CONFIG }}
+          SCOUT_PROFILE: ${{ secrets.SCOUT_PROFILE }}
+        run: |
+          [ -n "$SCOUT_CONFIG" ] && printf '%s' "$SCOUT_CONFIG" > scout.yaml || true
+          [ -n "$SCOUT_PROFILE" ] && printf '%s' "$SCOUT_PROFILE" > profile.yaml || true
+      - name: Restore state (seen URLs, page snapshots)
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: scout-state-${{ github.run_id }}
+          restore-keys: scout-state-
+      - run: uv run scout opportunities
+      - run: uv run scout intel --profile profile.yaml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ github.run_id }}
+          path: vault/

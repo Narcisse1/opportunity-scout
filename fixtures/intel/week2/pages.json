@@ -1,0 +1,12 @@
+[
+  {
+    "url": "https://rival.example.com/pricing",
+    "title": "RivalAI pricing (FICTIONAL DEMO DATA)",
+    "content": "# Pricing\n\nFictional demo page.\n\n## Free\n$0 per month\n1 research agent\n100 page scrapes per month\n\n## Starter\n$39 per month\nUp to 3 research agents\n1,000 page scrapes per month\n\n## Team\n$99 per month\nUp to 15 research agents\n10,000 page scrapes per month\nSlack integration\nNotion export\n\n## Enterprise\nContact sales\n\n(c) 2026 RivalAI. Last updated 2026-11-20."
+  },
+  {
+    "url": "https://rival.example.com/changelog",
+    "title": "RivalAI changelog (FICTIONAL DEMO DATA)",
+    "content": "# Changelog\n\nFictional demo page.\n\n## November 2026\n- Launched Grant Finder: an agent that matches startups to grants and drafts applications\n- Notion export for all reports\n\n## October 2026\n- Faster PDF parsing\n- Dark mode for the dashboard"
+  }
+]

@@ -1,0 +1,25 @@
+# Copy to profile.yaml and replace with your real startup's facts.
+# Drafted applications use ONLY what is written here, so be specific and truthful.
+name: Example Startup
+one_liner: AI assistant that helps smallholder farmers diagnose crop disease from a phone photo.
+description: >
+  Farmers send a photo over WhatsApp; a vision model identifies likely diseases and an LLM
+  replies with treatment advice in the farmer's language.
+stage: pre-seed
+sectors: [agritech, AI]
+country: Cameroon
+regions_served: [Central Africa, West Africa]
+founded_year: 2025
+team:
+  - "Founder/CTO: software engineer, builds the AI pipeline"
+funding_raised: "$0 (bootstrapped)"
+traction:
+  - "Pilot with 40 farmers"
+goals:
+  - non-dilutive funding to extend the pilot
+  - cloud / AI API credits
+  - mentorship and partner introductions
+exclude_keywords:
+  - crypto
+  - token sale
+writing_samples: []

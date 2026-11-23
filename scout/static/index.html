@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opportunity Scout</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #5d6673; --line: #e2e5ea;
+  --accent: #2f5bea; --accent-ink: #ffffff; --good: #1f8a4c; --warn: #b26a00; --bad: #c0392b;
+  --chip: #eef1f6; --code: #f1f3f6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216; --panel: #171b21; --text: #e6e9ee; --muted: #9aa4b1; --line: #2a313a;
+    --accent: #6f8fff; --accent-ink: #0f1216; --good: #4cc27d; --warn: #e3a33b; --bad: #ef6b5b;
+    --chip: #222831; --code: #1e242c;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { padding: 20px 16px 8px; max-width: 1100px; margin: 0 auto; }
+header h1 { margin: 0; font-size: 22px; }
+header p { margin: 4px 0 0; color: var(--muted); }
+main { max-width: 1100px; margin: 0 auto; padding: 8px 16px 48px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+.tabs button { background: none; border: 0; padding: 10px 14px; color: var(--muted);
+  font: inherit; cursor: pointer; border-bottom: 2px solid transparent; }
+.tabs button[aria-selected="true"] { color: var(--text); border-color: var(--accent); font-weight: 600; }
+.grid { display: grid; grid-template-columns: 360px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.panel h2 { font-size: 15px; margin: 0 0 12px; }
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+input, textarea, select { width: 100%; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+textarea { resize: vertical; min-height: 64px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > * { flex: 1; }
+.check { display: flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--text); font-size: 14px; }
+.check input { width: auto; }
+.btn { margin-top: 14px; width: 100%; padding: 10px; border: 0; border-radius: 6px;
+  background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; }
+.btn:disabled { opacity: .6; cursor: progress; }
+.btn.secondary { background: var(--chip); color: var(--text); width: auto; padding: 6px 12px; margin: 0; font-weight: 500; }
+.status { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 20px; }
+.status.err { color: var(--bad); }
+.summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+.chip { background: var(--chip); border-radius: 999px; padding: 2px 10px; font-size: 13px; color: var(--muted); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+.card.dim { opacity: .65; }
+.card-head { display: flex; gap: 12px; align-items: flex-start; }
+.score { min-width: 48px; height: 48px; border-radius: 8px; display: grid; place-items: center;
+  font-weight: 700; font-size: 18px; color: #fff; }
+.card h3 { margin: 0; font-size: 16px; }
+.card h3 a { color: inherit; }
+.meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.card ul { margin: 6px 0; padding-left: 20px; }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-top: 10px; }
+details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.answer { background: var(--code); border-radius: 6px; padding: 10px; margin: 8px 0; white-space: pre-wrap; }
+.answer b { display: block; margin-bottom: 4px; }
+.quote { border-left: 3px solid var(--line); padding-left: 10px; color: var(--muted); margin: 4px 0; font-size: 14px; }
+.headline { font-size: 17px; font-weight: 600; }
+.empty { color: var(--muted); text-align: center; padding: 40px 10px; }
+.pill { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--chip); }
+.pill.high { color: var(--bad); } .pill.medium { color: var(--warn); } .pill.low { color: var(--muted); }
+.hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Opportunity Scout</h1>
+  <p>AI research analyst: finds grants, accelerators &amp; hackathons that fit your startup, drafts the applications, and watches your competitors.</p>
+</header>
+<main>
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="opps">Opportunities</button>
+    <button role="tab" aria-selected="false" data-tab="intel">Competitor intel</button>
+    <button role="tab" aria-selected="false" data-tab="profile">Startup profile</button>
+  </nav>
+
+  <!-- Opportunities -->
+  <section id="tab-opps" class="grid">
+    <div class="panel">
+      <h2>Scan for opportunities</h2>
+      <label for="queries">Search queries (one per line)</label>
+      <textarea id="queries" rows="6"></textarea>
+      <div class="row">
+        <div><label for="minScore">Shortlist at score</label><input id="minScore" type="number" min="0" max="100" value="60"></div>
+        <div><label for="perQuery">Results / query</label><input id="perQuery" type="number" min="1" max="10" value="5"></div>
+      </div>
+      <label class="check"><input id="draft" type="checkbox" checked> Draft application answers</label>
+      <label class="check"><input id="oppOffline" type="checkbox"> Offline demo (sample pages, no web search)</label>
+      <button class="btn" id="runOpps">Run scan</button>
+      <div class="status" id="oppStatus"></div>
+      <p class="hint">Uses the profile from the "Startup profile" tab. A live scan takes a few minutes.</p>
+    </div>
+    <div id="oppResults"><div class="empty">Run a scan to see scored opportunities here.</div></div>
+  </section>
+
+  <!-- Intel -->
+  <section id="tab-intel" class="grid" hidden>
+    <div class="panel">
+      <h2>Competitors</h2>
+      <label for="competitors">One block per competitor</label>
+      <textarea id="competitors" rows="9"></textarea>
+      <p class="hint">Format: <code>name: RivalAI</code>, <code>news: RivalAI funding</code>, then <code>pricing = https://…</code> per tracked page. Separate competitors with a blank line.</p>
+      <label class="check"><input id="intelOffline" type="checkbox"> Offline demo</label>
+      <div class="row" id="fixtureRow" hidden>
+        <div><label for="fixtureSet">Demo week</label>
+          <select id="fixtureSet"><option value="week1">Week 1 (baseline)</option><option value="week2">Week 2 (changes)</option></select></div>
+      </div>
+      <button class="btn" id="runIntel">Check competitors</button>
+      <div class="status" id="intelStatus"></div>
+      <p class="hint">The first run of each page saves a baseline; later runs report what changed.</p>
+    </div>
+    <div id="intelResults"><div class="empty">Run a check to see the competitor briefing here.</div></div>
+  </section>
+
+  <!-- Profile -->
+  <section id="tab-profile" hidden>
+    <div class="panel">
+      <h2>Startup profile</h2>
+      <p class="hint">Saved in this browser only. Drafted answers use only these facts — anything missing becomes a <code>[[NEEDS: …]]</code> placeholder.</p>
+      <div class="row">
+        <div><label for="p-name">Startup name</label><input id="p-name"></div>
+        <div><label for="p-stage">Stage</label><input id="p-stage" placeholder="pre-seed, seed…"></div>
+        <div><label for="p-country">Country</label><input id="p-country"></div>
+      </div>
+      <label for="p-one_liner">One-liner</label><input id="p-one_liner">
+      <label for="p-description">Description</label><textarea id="p-description"></textarea>
+      <div class="row">
+        <div><label for="p-sectors">Sectors (comma separated)</label><input id="p-sectors"></div>
+        <div><label for="p-regions_served">Regions served (comma separated)</label><input id="p-regions_served"></div>
+      </div>
+      <div class="row">
+        <div><label for="p-founded_year">Founded year</label><input id="p-founded_year" type="number"></div>
+        <div><label for="p-funding_raised">Funding raised</label><input id="p-funding_raised"></div>
+      </div>
+      <label for="p-team">Team (one per line)</label><textarea id="p-team"></textarea>
+      <label for="p-traction">Traction (one per line)</label><textarea id="p-traction"></textarea>
+      <label for="p-goals">Goals (one per line)</label><textarea id="p-goals"></textarea>
+      <label for="p-exclude_keywords">Exclude keywords (comma separated)</label><input id="p-exclude_keywords">
+      <button class="btn" id="saveProfile" style="width:auto;padding:8px 18px">Save profile</button>
+      <span class="status" id="profileStatus"></span>
+    </div>
+  </section>
+
+  <div class="panel" id="tokenPanel" hidden style="margin-top:16px">
+    <label for="token">Access token (required by this server)</label>
+    <input id="token" type="password" autocomplete="off">
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("scout:" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("scout:" + k, JSON.stringify(v)); } catch {} },
+  };
+
+  // Safe DOM builder: text is always set via textContent, never innerHTML.
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === "class") node.className = v;
+      else if (k === "style") node.style.cssText = v;
+      else if (k === "href") { if (/^https?:\/\//i.test(v)) { node.href = v; node.target = "_blank"; node.rel = "noopener noreferrer"; } }
+      else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v);
+    }
+    for (const c of children.flat()) {
+      if (c === null || c === undefined || c === false) continue;
+      node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+    }
+    return node;
+  }
+  const list = (items) => items && items.length ? el("ul", {}, items.map((i) => el("li", {}, i))) : null;
+
+  // Tabs
+  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
+    for (const t of ["opps", "intel", "profile"]) $("tab-" + t).hidden = t !== b.dataset.tab;
+    store.set("tab", b.dataset.tab);
+  }));
+  const lastTab = store.get("tab", "opps");
+  document.querySelector(`.tabs button[data-tab="${lastTab}"]`)?.click();
+
+  // Profile
+  const DEFAULT_PROFILE = {
+    name: "Example Startup", one_liner: "AI assistant that diagnoses crop disease from a phone photo for smallholder farmers.",
+    description: "", stage: "pre-seed", sectors: ["agritech", "AI"], country: "Cameroon", regions_served: ["Central Africa"],
+    founded_year: 2025, team: ["Founder/CTO: software engineer"], funding_raised: "$0", traction: ["Pilot with 40 farmers"],
+    goals: ["non-dilutive funding", "cloud credits"], exclude_keywords: ["crypto"],
+  };
+  const LIST_COMMA = ["sectors", "regions_served", "exclude_keywords"];
+  const LIST_LINES = ["team", "traction", "goals"];
+  function fillProfile(p) {
+    for (const [k, v] of Object.entries(p)) {
+      const input = $("p-" + k); if (!input) continue;
+      input.value = Array.isArray(v) ? v.join(LIST_COMMA.includes(k) ? ", " : "\n") : (v ?? "");
+    }
+  }
+  function readProfile() {
+    const p = {};
+    for (const k of Object.keys(DEFAULT_PROFILE)) {
+      const raw = $("p-" + k).value.trim();
+      if (LIST_COMMA.includes(k)) p[k] = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      else if (LIST_LINES.includes(k)) p[k] = raw.split("\n").map((s) => s.trim()).filter(Boolean);
+      else if (k === "founded_year") p[k] = raw ? Number(raw) : null;
+      else p[k] = raw;
+    }
+    return p;
+  }
+  fillProfile(store.get("profile", DEFAULT_PROFILE));
+  $("saveProfile").addEventListener("click", () => {
+    const p = readProfile();
+    if (!p.name || !p.one_liner) { $("profileStatus").textContent = "Name and one-liner are required."; return; }
+    store.set("profile", p); $("profileStatus").textContent = "Saved.";
+  });
+
+  // Defaults for the other forms
+  $("queries").value = store.get("queries", [
+    "AI startup grant applications open 2027",
+    "pre-seed accelerator applications open Africa AI startups",
+    "AI agents hackathon 2027 prize registration",
+  ].join("\n"));
+  $("competitors").value = store.get("competitors",
+    "name: RivalAI\nnews: RivalAI\npricing = https://rival.example.com/pricing\nchangelog = https://rival.example.com/changelog");
+  $("intelOffline").addEventListener("change", () => { $("fixtureRow").hidden = !$("intelOffline").checked; });
+
+  // API
+  async function api(path, body) {
+    const headers = { "Content-Type": "application/json" };
+    const token = $("token").value.trim();
+    if (token) headers["X-Access-Token"] = token;
+    const res = await fetch(path, { method: body ? "POST" : "GET", headers, body: body ? JSON.stringify(body) : undefined });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = typeof data.detail === "string" ? data.detail
+        : Array.isArray(data.detail) ? data.detail.map((d) => `${d.loc?.slice(1).join(".")}: ${d.msg}`).join("; ")
+        : res.statusText;
+      throw new Error(detail || `HTTP ${res.status}`);
+    }
+    return data;
+  }
+  async function runJob(path, body, statusEl, button) {
+    button.disabled = true; statusEl.className = "status"; statusEl.textContent = "Starting…";
+    const started = Date.now();
+    try {
+      let job = await api(path, body);
+      while (job.status === "queued" || job.status === "running") {
+        statusEl.textContent = `Working… ${Math.round((Date.now() - started) / 1000)}s (searching, reading pages, scoring)`;
+        await new Promise((r) => setTimeout(r, 2000));
+        job = await api(`/api/jobs/${job.id}`);
+      }
+      if (job.status === "error") throw new Error(job.error);
+      const u = job.result.usage || {};
+      statusEl.textContent = `Done in ${Math.round((Date.now() - started) / 1000)}s · ${u.calls ?? 0} model calls · ~$${(u.estimated_cost_usd ?? 0).toFixed(3)}`;
+      return job.result;
+    } catch (e) {
+      statusEl.className = "status err"; statusEl.textContent = e.message; return null;
+    } finally { button.disabled = false; }
+  }
+  function download(name, text) {
+    const a = el("a", {}); a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
+    a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const scoreColor = (s) => s >= 75 ? "var(--good)" : s >= 50 ? "var(--warn)" : "var(--bad)";
+
+  // Opportunities
+  $("runOpps").addEventListener("click", async () => {
+    const queries = $("queries").value.split("\n").map((s) => s.trim()).filter(Boolean);
+    store.set("queries", $("queries").value);
+    const result = await runJob("/api/opportunities/scan", {
+      profile: store.get("profile", DEFAULT_PROFILE), queries,
+      min_score: Number($("minScore").value), results_per_query: Number($("perQuery").value),
+      draft: $("draft").checked, offline: $("oppOffline").checked,
+    }, $("oppStatus"), $("runOpps"));
+    if (result) renderOpps(result);
+  });
+
+  function renderOpps(r) {
+    const box = $("oppResults"); box.replaceChildren();
+    const shortlisted = r.opportunities.filter((o) => o.shortlisted);
+    box.append(el("div", { class: "summary" },
+      el("span", { class: "chip" }, `${r.documents_found} results`),
+      el("span", { class: "chip" }, `${r.documents_processed} new pages read`),
+      el("span", { class: "chip" }, `${shortlisted.length} shortlisted`),
+      el("button", { class: "btn secondary", onclick: () => download("opportunities.md", r.markdown) }, "Download Markdown"),
+    ));
+    if (!r.opportunities.length) box.append(el("div", { class: "empty" }, "No new opportunities found. Try different queries."));
+    for (const o of r.opportunities) box.append(oppCard(o));
+    if (r.errors.length) box.append(el("div", { class: "card" }, el("div", { class: "label" }, "Errors"), list(r.errors)));
+  }
+
+  function oppCard(o) {
+    const opp = o.opportunity, fit = o.fit, draft = o.draft;
+    const rejected = o.rejected && o.rejected.length;
+    const days = opp.deadline ? Math.round((new Date(opp.deadline) - new Date()) / 86400000) : null;
+    const card = el("div", { class: "card" + (o.shortlisted ? "" : " dim") },
+      el("div", { class: "card-head" },
+        el("div", { class: "score", style: `background:${rejected ? "var(--muted)" : scoreColor(o.score)}` }, rejected ? "—" : o.score),
+        el("div", {},
+          el("h3", {}, el("a", { href: o.url }, opp.name)),
+          el("div", { class: "meta" }, [opp.type, opp.organizer, opp.funding_or_prize,
+            opp.deadline ? `deadline ${opp.deadline}${days !== null ? ` (${days}d)` : ""}` : "no deadline stated",
+            fit ? fit.verdict : null].filter(Boolean).join(" · ")),
+        ),
+      ),
+      el("p", {}, opp.summary),
+    );
+    if (rejected) card.append(el("div", { class: "label" }, "Filtered out"), list(o.rejected));
+    if (fit) {
+      if (fit.reasons.length) card.append(el("div", { class: "label" }, "Why"), list(fit.reasons));
+      if (fit.eligibility_blockers.length) card.append(el("div", { class: "label" }, "Eligibility blockers"), list(fit.eligibility_blockers));
+      if (fit.risks.length) card.append(el("div", { class: "label" }, "Risks / unclear"), list(fit.risks));
+    }
+    if (draft) {
+      const d = el("details", {}, el("summary", {}, `Draft application (${draft.answers.length} answers)`));
+      for (const a of draft.answers) {
+        d.append(el("div", { class: "answer" }, el("b", {}, a.question), a.answer,
+          el("div", { style: "margin-top:6px" }, el("button", { class: "btn secondary", onclick: (e) => {
+            navigator.clipboard?.writeText(a.answer); e.target.textContent = "Copied"; } }, "Copy"))));
+      }
+      if (draft.missing_info.length) d.append(el("div", { class: "label" }, "Gather before submitting"), list(draft.missing_info));
+      card.append(d);
+    }
+    return card;
+  }
+
+  // Intel
+  function parseCompetitors(text) {
+    return text.split(/\n\s*\n/).map((block) => {
+      const c = { name: "", news_query: null, pages: {} };
+      for (const line of block.split("\n").map((s) => s.trim()).filter(Boolean)) {
+        let m;
+        if ((m = line.match(/^name\s*:\s*(.+)$/i))) c.name = m[1].trim();
+        else if ((m = line.match(/^news\s*:\s*(.+)$/i))) c.news_query = m[1].trim();
+        else if ((m = line.match(/^([^=]+)=\s*(https?:\/\/\S+)$/i))) c.pages[m[1].trim()] = m[2];
+      }
+      return c;
+    }).filter((c) => c.name);
+  }
+  $("runIntel").addEventListener("click", async () => {
+    store.set("competitors", $("competitors").value);
+    const competitors = parseCompetitors($("competitors").value);
+    if (!competitors.length) { $("intelStatus").className = "status err"; $("intelStatus").textContent = "Add at least one competitor with a name."; return; }
+    const result = await runJob("/api/intel/run", {
+      competitors, profile: store.get("profile", DEFAULT_PROFILE),
+      offline: $("intelOffline").checked, fixture_set: $("fixtureSet").value,
+    }, $("intelStatus"), $("runIntel"));
+    if (result) renderIntel(result);
+  });
+
+  function renderIntel(r) {
+    const box = $("intelResults"); box.replaceChildren();
+    box.append(el("div", { class: "summary" },
+      el("button", { class: "btn secondary", onclick: () => download("competitor-briefing.md", r.markdown) }, "Download Markdown")));
+    if (r.digest) {
+      box.append(el("div", { class: "card" },
+        el("div", { class: "headline" }, r.digest.headline),
+        el("div", { class: "label" }, "What it means for us"), list(r.digest.implications),
+        el("div", { class: "label" }, "Suggested actions"), list(r.digest.recommended_actions)));
+    } else {
+      box.append(el("div", { class: "card" }, "No meaningful changes detected. On a first run this saves a baseline — run again later (or pick Demo week 2) to see changes."));
+    }
+    for (const c of r.competitors) {
+      const card = el("div", { class: "card" }, el("h3", {}, c.name),
+        el("div", { class: "meta" }, c.pages.map((p) => `${p.label}: ${p.status}`).join(" · ") + ` · ${c.news.length} news`));
+      for (const f of c.findings) {
+        card.append(el("div", { style: "margin-top:10px" },
+          el("span", { class: "pill " + f.importance }, f.importance), " ",
+          el("span", { class: "pill" }, f.category), " ", f.summary,
+          el("div", { class: "quote" }, `"${f.evidence_quote}" `, el("a", { href: f.source_url }, "source"))));
+      }
+      if (c.ungrounded_dropped) card.append(el("div", { class: "hint" }, `${c.ungrounded_dropped} unverifiable finding(s) discarded by the grounding check.`));
+      if (c.error) card.append(el("div", { class: "status err" }, c.error));
+      box.append(card);
+    }
+  }
+
+  // Server capabilities
+  api("/api/health").then((h) => {
+    $("tokenPanel").hidden = !h.token_required;
+    if (!h.firecrawl && !h.exa) {
+      $("oppOffline").checked = true; $("intelOffline").checked = true; $("fixtureRow").hidden = false;
+      for (const id of ["oppStatus", "intelStatus"]) $(id).textContent = "Live web search isn't configured on this server — offline demo mode is on.";
+    }
+    if (!h.anthropic) for (const id of ["oppStatus", "intelStatus"]) { $(id).className = "status err"; $(id).textContent = "The server has no Anthropic API key configured."; }
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>
