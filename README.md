@@ -1,5 +1,8 @@
 # Opportunity Scout
 
+**Live demo:** https://opportunity-scout-98lk.onrender.com (free tier: the first load after
+idle can take about a minute to wake up)
+
 An autonomous research analyst built on **Claude** that does two jobs a startup founder
 usually does by hand:
 
