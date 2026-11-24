@@ -40,12 +40,17 @@ uv run scout web          # http://127.0.0.1:8000
 
 | Page | What you do there |
 |---|---|
-| **Discover** | Run a scan; filter and sort scored results; open draft answers; add to pipeline |
-| **Pipeline** | Move applications between stages, keep notes, see the next deadline, export `.ics` / CSV |
-| **Competitors** | Track competitor pages and news; read the sourced weekly briefing |
-| **Startup profile** | The facts used for eligibility and drafting, with a completeness meter |
+| **Discover** | Run a search; filter and sort scored results; open draft answers; add to Applications |
+| **Applications** | Track programs by stage, keep notes, see the next deadline, export `.ics` / CSV |
+| **Competitors** | Track competitor pages and news; read the sourced briefing |
+| **Company profile** | The facts used for eligibility and drafting, with a completeness meter |
 
-**Demo mode** runs on bundled sample pages, so it works without web-search keys. Scans run as
+The app opens with **Ekang Agritech**, a fictional demo company (a pre-seed crop-disease
+diagnosis startup in Cameroon), so it can be tried immediately. Replace it with your own
+company on the profile page; the profile is stored in your browser only. Photography by Richard
+Nyoni and Hendrik Morkel via [Unsplash](https://unsplash.com).
+
+**Sample pages** mode runs on bundled pages, so it works without web-search keys. Scans run as
 background jobs (`POST /api/opportunities/scan`, `POST /api/intel/run`, then poll
 `GET /api/jobs/{id}`); the pipeline lives at `/api/pipeline`, `/api/pipeline.ics` and
 `/api/pipeline.csv`. Scraped text is always rendered as text, never as HTML.
