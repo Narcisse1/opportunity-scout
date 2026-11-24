@@ -156,8 +156,6 @@ mark.need { background: var(--hl); color: var(--warn); padding: 0 3px; font-weig
 /* Photography */
 figure.photo { margin: 0; }
 figure.photo img { display: block; width: 100%; height: 260px; object-fit: cover; border-radius: 6px 6px 0 0; background: var(--rule); }
-figure.photo figcaption { font-size: 11px; color: var(--muted); padding: 6px 22px 0; text-align: right; }
-figure.photo figcaption a { color: var(--muted); }
 .hero-media { position: relative; }
 .hero img { height: 300px; filter: saturate(.9); }
 .hero .overlay { position: absolute; left: 0; right: 0; bottom: 0; padding: 60px 28px 22px; border-radius: 0;
@@ -196,17 +194,102 @@ dialog::backdrop { background: rgba(20, 22, 26, .45); }
   details.more { padding-left: 18px; }
   table.grid { display: block; overflow-x: auto; }
 }
+/* ------------------------------------------------------------------
+   Refinement layer: softer surfaces, iconography, banner and steps.
+   ------------------------------------------------------------------ */
+:root { --radius: 10px; --shadow: 0 1px 2px rgba(20, 24, 31, .04), 0 2px 8px rgba(20, 24, 31, .05);
+  --shadow-hover: 0 2px 4px rgba(20, 24, 31, .05), 0 10px 24px rgba(20, 24, 31, .08); }
+@media (prefers-color-scheme: dark) { :root { --shadow: none; --shadow-hover: 0 0 0 1px var(--rule-strong); } }
+.panel, .summary, .results, table.grid { border-radius: var(--radius); box-shadow: var(--shadow); }
+figure.photo img { border-radius: var(--radius) var(--radius) 0 0; }
+.btn { border-radius: 7px; transition: background .15s, box-shadow .15s, transform .15s; }
+.btn.primary { box-shadow: 0 1px 2px rgba(31, 45, 77, .25); }
+.btn.primary:hover { transform: translateY(-1px); }
+input:not([type=checkbox]), textarea, select { border-radius: 7px; transition: border-color .15s, box-shadow .15s; }
+
+/* Sidebar */
+nav.side { background: var(--surface); }
+.wordmark { display: flex; gap: 11px; align-items: center; }
+.mark { flex: none; width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; font-family: var(--serif); font-weight: 600; font-size: 19px; }
+.wordmark b { font-size: 16px; line-height: 1.2; white-space: nowrap; }
+.wordmark span:not(.mark) { white-space: nowrap; }
+.layout { grid-template-columns: 240px 1fr; }
+.wordmark { padding-left: 18px; padding-right: 14px; }
+.nav-label { padding: 18px 22px 2px; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.navlist { padding-top: 6px; }
+.navlist button { border-left: 0; border-radius: 8px; padding: 9px 12px; }
+.navlist button[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.nav-i { display: inline-flex; align-items: center; gap: 10px; }
+.nav-i svg { width: 17px; height: 17px; flex: none; opacity: .85; }
+.count:empty { display: none; }
+.count { background: var(--paper); border: 1px solid var(--rule); border-radius: 999px; padding: 0 7px; font-size: 11px; }
+
+/* Header */
+header.top { background: var(--surface); }
+header.top h1 { font-size: 28px; }
+
+/* Discover banner */
+.banner { position: relative; border-radius: 14px; overflow: hidden; margin-bottom: 28px; min-height: 280px; box-shadow: var(--shadow); background: #1d2433; }
+.banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; }
+.banner::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, rgba(14, 20, 34, .92) 0%, rgba(14, 20, 34, .78) 42%, rgba(14, 20, 34, .15) 100%); }
+.banner-text { position: relative; z-index: 1; padding: 38px 42px; max-width: 760px; color: #fff; }
+.banner-text h2, .banner-text p { max-width: 600px; }
+.banner-text h2 { color: #fff; font-size: 30px; line-height: 1.2; margin: 10px 0 10px; }
+.banner-text p { margin: 0; color: rgba(255, 255, 255, .82); font-size: 15px; line-height: 1.6; }
+.eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.eyebrow.light { color: rgba(255, 255, 255, .7); }
+.banner-facts { list-style: none; display: flex; flex-wrap: wrap; gap: 28px; padding: 0; margin: 26px 0 0; }
+.banner-facts li { padding-left: 12px; border-left: 2px solid rgba(255, 255, 255, .35); }
+.banner-facts b { display: block; font-size: 13.5px; color: #fff; }
+.banner-facts span { font-size: 12.5px; color: rgba(255, 255, 255, .7); }
+
+/* Ready card + steps */
+.ready { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; margin-bottom: 16px; }
+.ready h3 { margin: 4px 0 0; font-size: 18px; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.step { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+  transition: box-shadow .2s, transform .2s; }
+.step:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+.step-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+.step-icon svg { width: 21px; height: 21px; }
+.step-n { margin-top: 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.step h4 { margin: 4px 0 6px; font-family: var(--serif); font-size: 17px; font-weight: 600; }
+.step p { margin: 0; color: var(--ink-2); font-size: 13.5px; }
+.empty .step-icon { margin-bottom: 12px; }
+
+/* Results */
+.results { overflow: hidden; }
+.row { transition: background .15s; }
+.row:hover { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.score .bar { height: 3px; background: var(--rule); border-radius: 2px; margin: 6px 4px 0; overflow: hidden; }
+.score .bar i { display: block; height: 100%; background: currentColor; }
+.score.good .bar i { background: var(--good); } .score.warn .bar i { background: var(--warn); } .score.bad .bar i { background: var(--bad); }
+.summary { overflow: hidden; }
+.summary div { flex: 1; }
+
+/* Applications */
+table.grid tbody tr:not(.group):hover td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
+
+@media (max-width: 960px) {
+  .banner-text { padding: 28px 22px; } .banner-text h2 { font-size: 23px; }
+  .steps { grid-template-columns: 1fr; }
+  .nav-label { display: none; }
+}
 </style>
 </head>
 <body>
 <div class="layout">
   <nav class="side" aria-label="Main">
-    <div class="wordmark"><b>Opportunity Scout</b><span>Funding research for startups</span></div>
+    <div class="wordmark"><span class="mark">O</span><div><b>Opportunity Scout</b><span>Funding research for startups</span></div></div>
+    <div class="nav-label">Workspace</div>
     <div class="navlist">
-      <button data-page="discover" aria-current="page">Discover</button>
-      <button data-page="pipeline">Applications <span class="count" id="pipelineCount">0</span></button>
-      <button data-page="intel">Competitors</button>
-      <button data-page="profile">Company profile</button>
+      <button data-page="discover" aria-current="page"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Discover</span></button>
+      <button data-page="pipeline"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Applications</span><span class="count" id="pipelineCount"></span></button>
+      <button data-page="intel"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>Competitors</span></button>
+      <button data-page="profile"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/></svg>Company profile</span></button>
     </div>
     <div class="side-foot">
       <div id="statusModel"><span class="dot"></span>Connecting…</div>
@@ -224,6 +307,19 @@ dialog::backdrop { background: rgba(20, 22, 26, .45); }
     <div class="content">
       <!-- DISCOVER -->
       <section class="page" id="page-discover">
+        <div class="banner">
+          <img src="https://images.unsplash.com/photo-1573164574572-cb89e39749b4?w=1800&q=72&auto=format&fit=crop" alt="" aria-hidden="true">
+          <div class="banner-text">
+            <div class="eyebrow light">Grants · Accelerators · Competitions · Hackathons</div>
+            <h2>Funding is out there. Finding the right program shouldn't take weeks.</h2>
+            <p>Opportunity Scout reads program pages, rules out what you are not eligible for, ranks the rest and drafts the application answers.</p>
+            <ul class="banner-facts">
+              <li><b>Eligibility first</b><span>Checked against your profile</span></li>
+              <li><b>Sourced</b><span>Every result links to its page</span></li>
+              <li><b>No invented facts</b><span>Gaps are flagged in drafts</span></li>
+            </ul>
+          </div>
+        </div>
         <div class="cols">
           <div class="panel panel-pad">
             <h2>New search</h2>
@@ -296,7 +392,6 @@ dialog::backdrop { background: rgba(20, 22, 26, .45); }
           <div class="panel">
             <figure class="photo">
               <img src="https://images.unsplash.com/photo-1788122137580-4c4d92f4eaa3?w=900&q=70&auto=format&fit=crop" alt="Aerial view of rows of leafy vegetables growing in a field" loading="lazy" style="height:190px">
-              <figcaption>Photo by <a href="https://unsplash.com/@hdbernd" target="_blank" rel="noopener">Bernd Dittrich</a> on <a href="https://unsplash.com/photos/leafy-green-vegetables-in-field-4DUS-fpak78" target="_blank" rel="noopener">Unsplash</a></figcaption>
             </figure>
             <div class="panel-pad">
             <div class="msg note" id="demoHint" hidden style="margin:0 0 14px">This is a demo company profile. Replace it with your own company's details and save.</div>
@@ -366,6 +461,7 @@ dialog::backdrop { background: rgba(20, 22, 26, .45); }
     for (const [k, v] of Object.entries(attrs)) {
       if (v === null || v === undefined || v === false) continue;
       if (k === "class") node.className = v;
+      else if (k === "html") node.innerHTML = v; // only for the static ICONS below, never page content
       else if (k === "style") node.style.cssText = v;
       else if (k === "href") { if (/^https?:\/\//i.test(v)) { node.href = v; node.target = "_blank"; node.rel = "noopener noreferrer"; } }
       else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
@@ -377,6 +473,13 @@ dialog::backdrop { background: rgba(20, 22, 26, .45); }
     }
     return node;
   }
+  const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICONS = {
+    read: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>'),
+    check: svg('<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>'),
+    pen: svg('<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
+    radar: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/>'),
+  };
   const list = (items) => items && items.length ? el("ul", {}, items.map((i) => el("li", {}, i))) : null;
   function toast(msg, err = false) { const t = el("div", { class: "toast" + (err ? " err" : "") }, msg); $("toasts").append(t); setTimeout(() => t.remove(), 3500); }
   function message(target, kind, msg) { $(target).replaceChildren(msg ? el("div", { class: "msg " + kind }, msg) : ""); }
@@ -612,23 +715,18 @@ dialog::backdrop { background: rgba(20, 22, 26, .45); }
   function renderDiscoverEmpty() {
     if (lastScan) return;
     const hasProfile = !!(profile()?.name);
-    $("oppResults").replaceChildren(el("div", { class: "panel" },
-      el("figure", { class: "photo hero" },
-        el("div", { class: "hero-media" },
-          el("img", { src: "https://images.unsplash.com/photo-1573164574572-cb89e39749b4?w=1400&q=70&auto=format&fit=crop",
-            alt: "A team working on laptops around a table in a bright modern office", loading: "eager" }),
-          el("div", { class: "overlay" },
-            el("h3", {}, "Funding is out there. Finding the right program shouldn't take weeks."),
-            el("p", {}, "Opportunity Scout reads program pages, rules out what you are not eligible for, ranks the rest and drafts the application answers."))),
-        el("figcaption", {}, "Photo by ", el("a", { href: "https://unsplash.com/@wocintechchat" }, "Christina @ wocintechchat.com"), " on ",
-          el("a", { href: "https://unsplash.com/photos/group-of-people-sitting-beside-rectangular-wooden-table-with-laptops-faEfWCdOKIg" }, "Unsplash"))),
-      el("div", { class: "empty", style: "padding-top:18px" },
-        el("h3", {}, hasProfile ? "Ready to search" : "Before your first search"),
-        el("ol", {},
-          el("li", {}, hasProfile ? `Searching for ${profile().name}. ` : "Complete your company profile. ",
-            el("button", { class: "btn link", onclick: () => go("profile") }, hasProfile ? "Edit profile" : "Open profile")),
-          el("li", {}, "Adjust the search queries on the left, one per line, then run the search."),
-          el("li", {}, "Add promising programs to Applications and track them through to submission.")))));
+    const step = (n, icon, title, text) => el("div", { class: "step" },
+      el("div", { class: "step-icon", html: icon }), el("div", { class: "step-n" }, `Step ${n}`), el("h4", {}, title), el("p", {}, text));
+    $("oppResults").replaceChildren(
+      el("div", { class: "panel ready" },
+        el("div", {},
+          el("div", { class: "eyebrow" }, hasProfile ? "Ready to search" : "Before your first search"),
+          el("h3", {}, hasProfile ? `Searching on behalf of ${profile().name}` : "Complete your company profile")),
+        el("button", { class: "btn", onclick: () => go("profile") }, hasProfile ? "Edit profile" : "Open profile")),
+      el("div", { class: "steps" },
+        step(1, ICONS.read, "Read every program", "Search results are opened and read in full, not judged by their headline."),
+        step(2, ICONS.check, "Rule out the ineligible", "Location, stage and sector requirements are checked against your profile."),
+        step(3, ICONS.pen, "Draft the application", "Answers are written from your facts only. Gaps are flagged, never invented.")));
   }
   renderDiscoverEmpty();
 
@@ -691,7 +789,8 @@ dialog::backdrop { background: rgba(20, 22, 26, .45); }
     factNodes.push(sep(), deadlineText(opp.deadline));
     const row = el("div", { class: "row" + (o.shortlisted ? "" : " dim") },
       el("div", { class: "row-main" },
-        el("div", { class: "score " + (rejected ? "" : band(o.score)) }, el("b", {}, rejected ? "–" : o.score), el("span", {}, rejected ? "Excluded" : fit ? fit.verdict : "")),
+        el("div", { class: "score " + (rejected ? "" : band(o.score)) }, el("b", {}, rejected ? "–" : o.score), el("span", {}, rejected ? "Excluded" : fit ? fit.verdict : ""),
+          rejected ? null : el("div", { class: "bar" }, el("i", { style: `width:${Math.max(0, Math.min(100, o.score))}%` }))),
         el("div", {},
           el("h3", { class: "title" }, el("a", { href: o.url }, opp.name)),
           el("div", { class: "facts" }, factNodes),
@@ -750,8 +849,12 @@ dialog::backdrop { background: rgba(20, 22, 26, .45); }
       return c;
     }).filter((c) => c.name);
   }
-  $("intelResults").replaceChildren(el("div", { class: "panel empty" }, el("h3", {}, "No checks yet"),
-    el("p", { class: "lede" }, "The first check stores a copy of each page. Later checks report pricing changes, launches, funding and hiring, each with the quoted text it is based on.")));
+  $("intelResults").replaceChildren(el("div", { class: "panel" },
+    el("figure", { class: "photo" }, el("img", { src: "https://images.unsplash.com/photo-1573164574397-dd250bc8a598?w=1400&q=72&auto=format&fit=crop", alt: "", "aria-hidden": "true" })),
+    el("div", { class: "empty" },
+      el("div", { class: "step-icon", html: ICONS.radar }),
+      el("h3", {}, "Know when competitors move"),
+      el("p", { class: "lede" }, "The first check stores a copy of each tracked page. Later checks report pricing changes, launches, funding and hiring, each backed by the exact text it is based on."))));
   $("runIntel").addEventListener("click", async () => {
     ls.set("competitors", $("competitors").value);
     const competitors = parseCompetitors($("competitors").value);
