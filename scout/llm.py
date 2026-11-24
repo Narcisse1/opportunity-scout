@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol, TypeVar
 
@@ -209,15 +210,17 @@ def _name(value: Any) -> str:
 
 
 _SPECIALISED = ("image", "tts", "audio", "live", "embedding", "vision", "learnlm", "robotics")
-_UNSTABLE = ("preview", "exp", "lite")
+_PREVIEW = ("preview", "exp")
 
 
-def pick_gemini_model(models: Any) -> str | None:
-    """Choose the newest general-purpose Flash model that supports generateContent.
+def rank_gemini_models(models: Any) -> list[str]:
+    """General-purpose Flash models that support generateContent, best first.
 
     Google renames and retires Gemini model IDs often, so the app asks the API which models
-    this key can use instead of hard-coding one. Stable models win over preview/lite ones."""
-    stable, fallback = [], []
+    this key can use instead of hard-coding one. Order: stable Flash (newest first), then
+    stable Flash-Lite, then previews. Each model has its own quota, so later entries are
+    fallbacks when an earlier one is overloaded or out of free-tier requests."""
+    ranked = []
     for m in models:
         name = str(getattr(m, "name", "") or "").removeprefix("models/")
         actions = getattr(m, "supported_actions", None) or getattr(
@@ -229,16 +232,40 @@ def pick_gemini_model(models: Any) -> str | None:
             continue
         if any(word in name for word in _SPECIALISED):
             continue
+        tier = 2 if any(w in name for w in _PREVIEW) else 1 if "lite" in name else 0
         version = tuple(int(n) for n in re.findall(r"\d+", name.split("flash")[0]))
-        # Prefer bare names ("gemini-3-flash") over dated variants with the same version.
-        rank = (version, -len(name))
-        (fallback if any(word in name for word in _UNSTABLE) else stable).append((rank, name))
-    pool = stable or fallback
-    return max(pool)[1] if pool else None
+        # Within a tier: newest version first, then bare names over dated variants.
+        ranked.append(((tier, tuple(-v for v in version), len(name)), name))
+    return [name for _, name in sorted(ranked)]
 
 
-_discovered: dict[int, str] = {}  # id(client) -> model, shared by the LLMs of one process
+def pick_gemini_model(models: Any) -> str | None:
+    ranked = rank_gemini_models(models)
+    return ranked[0] if ranked else None
+
+
+class LLMQuotaExceeded(LLMError):
+    """Every usable model is out of quota; retrying now would only waste time."""
+
+
+_candidates: dict[int, list[str]] = {}  # id(client) -> ranked models, shared per process
+_unavailable: dict[str, float] = {}  # model -> unix time until which it should not be used
 _discover_lock = threading.Lock()
+
+_RETRY_IN = re.compile(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?", re.I)
+
+
+def _retry_after_seconds(message: str, default: float) -> float:
+    m = _RETRY_IN.search(message)
+    if not m or not any(m.groups()):
+        return default
+    h, mins, secs = (float(g) if g else 0.0 for g in m.groups())
+    return h * 3600 + mins * 60 + secs
+
+
+def _is_daily_quota(message: str) -> bool:
+    text = message.lower()
+    return "perday" in text or "per day" in text or "requests per day" in text
 
 
 class GeminiLLM:
@@ -261,19 +288,39 @@ class GeminiLLM:
         self.attempts = attempts
         self.usage = UsageMeter(model=self.model or "gemini")
 
-    def _discover_model(self, *, refresh: bool = False) -> str:
+    def _ranked_models(self) -> list[str]:
         with _discover_lock:
             key = id(self.client)
-            if refresh or key not in _discovered:
+            if key not in _candidates:
                 try:
-                    chosen = pick_gemini_model(self.client.models.list())
+                    ranked = rank_gemini_models(self.client.models.list())
                 except Exception as exc:
                     raise LLMError(f"could not list Gemini models for this key: {exc}") from exc
-                if not chosen:
+                if not ranked:
                     raise LLMError("no Gemini Flash model with generateContent is available")
-                log.warning("using Gemini model %s", chosen)
-                _discovered[key] = chosen
-            return _discovered[key]
+                log.warning("Gemini models available (best first): %s", ", ".join(ranked))
+                _candidates[key] = ranked
+            return _candidates[key]
+
+    def _next_model(self) -> str:
+        """Best model not currently marked unavailable; raises when all are exhausted."""
+        now = time.time()
+        for name in self._ranked_models():
+            if _unavailable.get(name, 0) <= now:
+                return name
+        soonest = min(_unavailable.get(n, now) for n in self._ranked_models()) - now
+        hours = max(soonest, 0) / 3600
+        when = f"in about {hours:.0f}h" if hours >= 1 else "within the hour"
+        raise LLMQuotaExceeded(
+            "Gemini free-tier quota is used up for every available model "
+            f"(resets {when}). Enable billing on the Gemini API key or switch to Claude "
+            "for higher limits."
+        )
+
+    def _mark_unavailable(self, model: str, seconds: float, why: str) -> None:
+        with _discover_lock:
+            _unavailable[model] = max(_unavailable.get(model, 0), time.time() + seconds)
+        log.warning("Gemini model %s set aside for %.0fs (%s)", model, seconds, why)
 
     def _set_model(self, model: str) -> None:
         self.model = model
@@ -292,9 +339,10 @@ class GeminiLLM:
 
     def _generate(self, system: str, prompt: str, schema: type[BaseModel]) -> Any:
         config = self._config(system, schema)
-        if self.model is None:
-            self._set_model(self._discover_model())
-        rediscovered = False
+        pinned = self.model is not None  # an explicit model is tried first, then the ranking
+        if not pinned or _unavailable.get(self.model, 0) > time.time():
+            self._set_model(self._next_model())
+        overloaded = 0
         for attempt in range(self.attempts):
             try:
                 return self.client.models.generate_content(
@@ -302,22 +350,35 @@ class GeminiLLM:
                 )
             except Exception as exc:  # SDK raises google.genai.errors.APIError subclasses
                 code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-                if code == 404 and not rediscovered:
-                    # The model was renamed or retired: switch to one this key can use.
-                    rediscovered = True
-                    replacement = self._discover_model(refresh=True)
-                    if replacement != self.model:
-                        log.warning(
-                            "Gemini model %s unavailable; using %s", self.model, replacement
-                        )
-                        self._set_model(replacement)
-                        continue
+                message = str(exc)
+                if code == 404:
+                    # Renamed or retired model: never use it again in this process.
+                    self._mark_unavailable(self.model, 365 * 86400, "not found")
+                    self._set_model(self._next_model())
+                    continue
+                if code == 429 and _is_daily_quota(message):
+                    # Daily quotas are per model: move on instead of waiting hours.
+                    wait = _retry_after_seconds(message, 6 * 3600)
+                    self._mark_unavailable(self.model, wait, "daily quota used up")
+                    self._set_model(self._next_model())
+                    continue
+                if code == 503:
+                    overloaded += 1
+                    if overloaded >= 2:
+                        # Persistently overloaded: rest this model briefly, try another one.
+                        self._mark_unavailable(self.model, 300, "overloaded")
+                        try:
+                            self._set_model(self._next_model())
+                            overloaded = 0
+                            continue
+                        except LLMQuotaExceeded:
+                            pass  # nothing else to try; fall through to backoff
                 if code not in RETRYABLE_CODES or attempt == self.attempts - 1:
                     raise LLMError(f"gemini request failed: {exc}") from exc
-                # Free-tier rate limits are per minute, so back off generously.
-                delay = min(5 * 2**attempt, 60)
-                log.info("gemini %s, retrying in %ss", code, delay)
-                http._sleep(delay)
+                # Per-minute rate limits and brief overloads: back off and retry.
+                delay = _retry_after_seconds(message, min(5 * 2**attempt, 60))
+                log.info("gemini %s, retrying in %.0fs", code, delay)
+                http._sleep(min(delay, 60))
         raise LLMError("gemini request failed")  # pragma: no cover
 
     def structured(self, *, system: str, prompt: str, schema: type[T]) -> T:

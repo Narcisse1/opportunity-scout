@@ -87,6 +87,7 @@ def serialize_scan(report: ScanReport, min_score: int, today: date) -> dict[str,
             {**o.record(), "shortlisted": o.key in shortlist} for o in report.opportunities
         ],
         "errors": report.errors,
+        "notice": report.notice,
         "usage": report.usage,
         "markdown": opportunities_markdown(report, min_score, today),
     }

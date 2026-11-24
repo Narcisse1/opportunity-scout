@@ -620,7 +620,8 @@ mark.need { background: var(--warn-weak); color: var(--warn); padding: 0 3px; bo
     const types = [...new Set(result.opportunities.map((o) => o.type))].sort();
     $("oppType").replaceChildren(el("option", { value: "" }, "All types"), types.map((t) => el("option", { value: t }, t)));
     const u = result.usage || {};
-    alertBox("oppAlert", "ok", `Done · ${u.calls ?? 0} AI calls · est. $${(u.estimated_cost_usd ?? 0).toFixed(3)}`);
+    if (result.notice) alertBox("oppAlert", "err", result.notice);
+    else alertBox("oppAlert", "ok", `Done · ${u.calls ?? 0} AI calls · est. $${(u.estimated_cost_usd ?? 0).toFixed(3)}`);
     renderOpps();
   });
   ["oppFilter", "oppType", "oppSort", "showAll"].forEach((id) => $(id).addEventListener("input", () => lastScan && renderOpps()));

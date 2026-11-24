@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
 from .http import SourceError
-from .llm import LLMError, StructuredLLM
+from .llm import LLMError, LLMQuotaExceeded, StructuredLLM
 from .models import (
     ApplicationDraft,
     ExtractedOpportunity,
@@ -139,6 +139,7 @@ class ScanReport:
     opportunities: list[ScoredOpportunity] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     usage: dict = field(default_factory=dict)
+    notice: str = ""  # e.g. the run stopped early because the AI quota ran out
 
     def shortlist(self, min_score: int) -> list[ScoredOpportunity]:
         keep = [o for o in self.opportunities if o.fit and o.score >= min_score]
@@ -212,12 +213,25 @@ class OpportunityScout:
         log.info("%d results, %d new pages to analyse", len(docs), len(new_docs))
 
         results: dict[str, ScoredOpportunity] = {}
+        quota_error: LLMQuotaExceeded | None = None
+        skipped = 0
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
             futures = {pool.submit(self._process, doc, today): doc for doc in new_docs}
             for future in as_completed(futures):
                 doc = futures[future]
+                if future.cancelled():
+                    skipped += 1
+                    continue
                 try:
                     found = future.result()
+                except LLMQuotaExceeded as exc:
+                    # Out of AI quota: stop instead of failing every remaining page.
+                    if quota_error is None:
+                        quota_error = exc
+                        for other in futures:
+                            other.cancel()
+                    skipped += 1
+                    continue
                 except (LLMError, SourceError) as exc:
                     # Not marked seen, so the page is retried on the next run.
                     report.errors.append(f"{doc.url}: {exc}")
@@ -229,6 +243,12 @@ class OpportunityScout:
                     current = results.get(item.key)
                     if current is None or item.score > current.score:
                         results[item.key] = item
+
+        if quota_error is not None:
+            report.notice = (
+                f"Stopped early: {quota_error} {skipped} page(s) were not analysed and will be "
+                "picked up by the next scan."
+            )
 
         for item in results.values():
             if item.fit is not None:  # rule-rejected items are reported, not stored

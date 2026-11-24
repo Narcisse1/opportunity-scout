@@ -75,6 +75,8 @@ def opportunities_markdown(report: ScanReport, min_score: int, today: date) -> s
         for item in rejected:
             why = "; ".join(item.rejected) or f"{item.score}/100 ({item.fit.verdict})"
             out.append(f"- {item.opportunity.name} — {why}")
+    if report.notice:
+        out.append(f"\n> [!warning] {report.notice}")
     if report.errors:
         out.append("\n## Errors\n" + "".join(f"\n- {e}" for e in report.errors))
     return "\n".join(out) + "\n"

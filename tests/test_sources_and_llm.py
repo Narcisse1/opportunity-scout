@@ -120,6 +120,21 @@ class _Fetch:
         return self.doc
 
 
+def test_multisource_caps_results_and_interleaves_sources():
+    from scout.sources import Document
+
+    a = [Document(f"https://a.org/{i}", "", "x", "fc") for i in range(5)]
+    b = [Document(f"https://b.org/{i}", "", "x", "exa") for i in range(5)]
+    docs = MultiSource([_Fixed("fc", a), _Fixed("exa", b)]).search("q", limit=5)
+    assert [d.url for d in docs] == [
+        "https://a.org/0",
+        "https://b.org/0",
+        "https://a.org/1",
+        "https://b.org/1",
+        "https://a.org/2",
+    ]
+
+
 def test_fallback_fetcher_tries_next_provider():
     from scout.sources import Document, FallbackFetcher
 

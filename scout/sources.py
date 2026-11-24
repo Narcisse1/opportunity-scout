@@ -176,19 +176,32 @@ class MultiSource:
         self.sources = sources
 
     def search(self, query: str, limit: int = 5, since_days: int | None = None) -> list[Document]:
-        merged: dict[str, Document] = {}
+        """Return at most `limit` pages, taking each source's top results in turn.
+
+        Capping matters: every page costs AI calls, so two sources must not double the work."""
+        per_source: list[list[Document]] = []
         errors = []
         for source in self.sources:
             try:
-                for doc in source.search(query, limit, since_days):
-                    existing = merged.get(doc.url)
-                    if existing is None or len(doc.content) > len(existing.content):
-                        merged[doc.url] = doc
+                per_source.append(source.search(query, limit, since_days))
             except SourceError as exc:
                 errors.append(f"{source.name}: {exc}")
-        if errors and not merged:
+        if errors and not any(per_source):
             raise SourceError("; ".join(errors))
-        return list(merged.values())
+
+        best: dict[str, Document] = {}  # url -> the version with the most text
+        order: list[str] = []
+        for rank in range(max((len(r) for r in per_source), default=0)):
+            for results in per_source:
+                if rank >= len(results):
+                    continue
+                doc = results[rank]
+                if doc.url not in best:
+                    order.append(doc.url)
+                    best[doc.url] = doc
+                elif len(doc.content) > len(best[doc.url].content):
+                    best[doc.url] = doc
+        return [best[url] for url in order[:limit]]
 
 
 class FallbackFetcher:

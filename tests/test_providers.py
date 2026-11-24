@@ -9,9 +9,11 @@ from scout.llm import (
     ClaudeLLM,
     GeminiLLM,
     LLMError,
+    LLMQuotaExceeded,
     LLMRefusal,
     make_llm,
     pick_gemini_model,
+    rank_gemini_models,
     resolve_provider,
 )
 from scout.models import FitAssessment
@@ -75,8 +77,8 @@ def test_cost_uses_model_prices():
 
 
 class _ApiError(Exception):
-    def __init__(self, code):
-        super().__init__(f"HTTP {code}")
+    def __init__(self, code, message=""):
+        super().__init__(message or f"HTTP {code}")
         self.code = code
 
 
@@ -132,14 +134,61 @@ class _GeminiClient:
 
 @pytest.fixture(autouse=True)
 def fresh_discovery(monkeypatch):
-    monkeypatch.setattr(llm_module, "_discovered", {})
+    monkeypatch.setattr(llm_module, "_candidates", {})
+    monkeypatch.setattr(llm_module, "_unavailable", {})
 
 
-def test_pick_gemini_model_prefers_newest_stable_flash():
+def test_rank_gemini_models():
+    assert rank_gemini_models(AVAILABLE) == [
+        "gemini-3-flash",
+        "gemini-2.5-flash",
+        "gemini-3-flash-lite",
+        "gemini-3.5-flash-preview-09-2026",
+    ]
     assert pick_gemini_model(AVAILABLE) == "gemini-3-flash"
     only_preview = [_model("gemini-2.5-flash-lite"), _model("gemini-3.5-flash-preview")]
-    assert pick_gemini_model(only_preview) == "gemini-3.5-flash-preview"
+    assert pick_gemini_model(only_preview) == "gemini-2.5-flash-lite"
     assert pick_gemini_model([_model("gemini-3-pro")]) is None
+
+
+DAILY = (
+    "429 RESOURCE_EXHAUSTED. Quota exceeded for metric: generate_content_free_tier_requests, "
+    "limit: 20. Generate content requests per day limit exceeded on Free Tier. "
+    "Please retry in 2h0m30s."
+)
+
+
+def test_gemini_rotates_model_when_daily_quota_is_used_up():
+    client = _GeminiClient(
+        _ApiError(429, DAILY), _gemini_response(parsed=FIT), _gemini_response(parsed=FIT)
+    )
+    assert GeminiLLM(client=client).structured(system="s", prompt="p", schema=FitAssessment) is FIT
+    # A new LLM (the next scan job) skips the exhausted model without retrying it.
+    GeminiLLM(client=client).structured(system="s", prompt="p", schema=FitAssessment)
+    assert [c["model"] for c in client.calls] == [
+        "gemini-3-flash",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash",
+    ]
+
+
+def test_gemini_stops_when_every_model_is_out_of_quota():
+    client = _GeminiClient(_ApiError(429, DAILY), available=[_model("gemini-3-flash")])
+    with pytest.raises(LLMQuotaExceeded, match="resets in about 2h"):
+        GeminiLLM(client=client).structured(system="s", prompt="p", schema=FitAssessment)
+    with pytest.raises(LLMQuotaExceeded):  # later calls fail fast, without a request
+        GeminiLLM(client=client).structured(system="s", prompt="p", schema=FitAssessment)
+    assert len(client.calls) == 1
+
+
+def test_gemini_moves_off_an_overloaded_model():
+    client = _GeminiClient(_ApiError(503), _ApiError(503), _gemini_response(parsed=FIT))
+    assert GeminiLLM(client=client).structured(system="s", prompt="p", schema=FitAssessment) is FIT
+    assert [c["model"] for c in client.calls] == [
+        "gemini-3-flash",
+        "gemini-3-flash",
+        "gemini-2.5-flash",
+    ]
 
 
 def test_gemini_auto_discovers_model_once():

@@ -206,6 +206,33 @@ def test_failed_page_is_reported_and_retried_next_run(profile):
     assert [o.opportunity.name for o in report2.shortlist(60)] == ["Lumen Founders Grant"]
 
 
+def test_scan_stops_cleanly_when_ai_quota_runs_out(profile):
+    from scout.llm import LLMQuotaExceeded
+
+    store = Store()
+
+    def no_quota(system, prompt):
+        return LLMQuotaExceeded("Gemini free-tier quota is used up (resets in about 3h).")
+
+    source = FixtureSource(FIXTURES / "opportunities")
+    llm = FakeLLM({ExtractionResult: no_quota})
+    scout = OpportunityScout(
+        profile,
+        search=source,
+        fetcher=source,
+        llm=llm,
+        store=store,
+        max_workers=1,
+        min_content_chars=10,
+    )
+    report = scout.run(["grant hackathon accelerator AI"], 10, today=TODAY)
+    assert report.notice.startswith("Stopped early: Gemini free-tier quota is used up")
+    assert "will be picked up by the next scan" in report.notice
+    assert report.errors == [] and report.documents_processed == 0
+    assert llm.count("ExtractionResult") < 4  # remaining pages were cancelled, not attempted
+    assert not store.is_seen("https://example.org/lumen-founders-grant")
+
+
 def test_untrusted_content_is_wrapped(profile):
     llm = make_llm()
     make_scout(profile, llm, Store()).run(["AI trends"], 10, today=TODAY)
