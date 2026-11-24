@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scout.llm import ClaudeLLM  # noqa: E402
+from scout.llm import make_llm  # noqa: E402
 from scout.models import ExtractedOpportunity, FitAssessment, StartupProfile  # noqa: E402
 from scout.opportunities import clamp_score  # noqa: E402
 from scout.prompts import fit_system  # noqa: E402
@@ -35,13 +35,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cases", default=str(HERE / "fit_cases.yaml"))
     parser.add_argument("--repeat", type=int, default=1)
-    parser.add_argument("--model", default="claude-opus-5-5")
+    parser.add_argument("--provider", default=None, help="anthropic or gemini")
+    parser.add_argument("--model", default=None)
     args = parser.parse_args()
 
     spec = yaml.safe_load(Path(args.cases).read_text(encoding="utf-8"))
     profile = StartupProfile.model_validate(spec["profile"])
     system = fit_system(profile)
-    llm = ClaudeLLM(args.model)
+    llm = make_llm(args.provider, args.model)
     today = date(2026, 11, 23)  # fixed so labels stay valid as time passes
 
     rows, confusion = [], Counter()
@@ -81,7 +82,7 @@ def main() -> int:
     inel = [r for r in rows if r["expected"] == "ineligible"]
     inel_recall = sum(r["got"] == "ineligible" for r in inel) / len(inel) if inel else None
     summary = {
-        "model": args.model,
+        "model": llm.usage.model,
         "cases": total,
         "accuracy": round(accuracy, 3),
         "ineligible_recall": inel_recall,

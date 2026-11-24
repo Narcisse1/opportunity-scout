@@ -39,6 +39,14 @@ CREATE TABLE IF NOT EXISTS snapshots (
 CREATE INDEX IF NOT EXISTS idx_snapshots_url ON snapshots(url, fetched_at);
 """
 
+# Where an opportunity sits in the founder's application pipeline.
+PIPELINE_STATUSES = ("new", "saved", "applying", "submitted", "won", "lost", "dismissed")
+
+MIGRATIONS = {
+    "status": "ALTER TABLE opportunities ADD COLUMN status TEXT NOT NULL DEFAULT 'new'",
+    "notes": "ALTER TABLE opportunities ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+}
+
 
 def content_hash(text: str) -> str:
     normalized = " ".join(text.split())
@@ -52,6 +60,11 @@ class Store:
         self._lock = threading.Lock()
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.executescript(SCHEMA)
+        columns = {row[1] for row in self.conn.execute("PRAGMA table_info(opportunities)")}
+        with self.conn:
+            for column, ddl in MIGRATIONS.items():
+                if column not in columns:
+                    self.conn.execute(ddl)
 
     def close(self) -> None:
         self.conn.close()
@@ -100,14 +113,36 @@ class Store:
                 ),
             )
 
-    def list_opportunities(self, min_score: int = 0) -> list[dict[str, Any]]:
+    def list_opportunities(
+        self, min_score: int = 0, statuses: list[str] | None = None
+    ) -> list[dict[str, Any]]:
+        sql = (
+            "SELECT payload, status, notes, updated FROM opportunities "
+            "WHERE COALESCE(score, 0) >= ?"
+        )
+        params: list[Any] = [min_score]
+        if statuses:
+            sql += f" AND status IN ({','.join('?' * len(statuses))})"
+            params += statuses
+        sql += " ORDER BY COALESCE(deadline, '9999-12-31') ASC, score DESC"
         with self._lock:
-            rows = self.conn.execute(
-                "SELECT payload FROM opportunities WHERE COALESCE(score, 0) >= ? "
-                "ORDER BY score DESC, deadline ASC",
-                (min_score,),
-            ).fetchall()
-        return [json.loads(r[0]) for r in rows]
+            rows = self.conn.execute(sql, params).fetchall()
+        return [
+            {**json.loads(payload), "status": status, "notes": notes, "updated": updated}
+            for payload, status, notes, updated in rows
+        ]
+
+    # --- application pipeline -------------------------------------------------
+    def set_status(self, key: str, status: str, notes: str | None, now: str) -> bool:
+        if status not in PIPELINE_STATUSES:
+            raise ValueError(f"unknown status {status!r}")
+        with self._lock, self.conn:
+            cur = self.conn.execute(
+                "UPDATE opportunities SET status = ?, notes = COALESCE(?, notes), updated = ? "
+                "WHERE key = ?",
+                (status, notes, now, key),
+            )
+        return cur.rowcount > 0
 
     # --- page snapshots -------------------------------------------------------
     def latest_snapshot(self, url: str) -> tuple[str, str] | None:

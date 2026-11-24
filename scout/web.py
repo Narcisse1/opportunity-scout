@@ -15,22 +15,26 @@ import time
 import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from .config import env
+from .exports import to_csv, to_ics
 from .intel import IntelMonitor, IntelReport
-from .llm import ClaudeLLM, StructuredLLM
+from .llm import StructuredLLM, make_llm, provider_ready, resolve_provider
 from .models import Competitor, StartupProfile
 from .opportunities import OpportunityScout, ScanReport
 from .publish import intel_markdown, opportunities_markdown
 from .sources import ExaSource, FirecrawlSource, FixtureSource, MultiSource
 from .store import Store
+
+TRACKED = ["saved", "applying", "submitted", "won", "lost"]
+PipelineStatus = Literal["new", "saved", "applying", "submitted", "won", "lost", "dismissed"]
 
 STATIC = Path(__file__).resolve().parent / "static"
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
@@ -55,6 +59,13 @@ class IntelRequest(BaseModel):
     news_days: int = Field(7, ge=1, le=60)
     offline: bool = False
     fixture_set: Literal["week1", "week2"] = "week1"
+
+
+class PipelineUpdate(BaseModel):
+    status: PipelineStatus
+    notes: str | None = Field(None, max_length=5000)
+    # The scan result to start tracking (needed the first time; scans can be offline/in-memory).
+    record: dict[str, Any] | None = None
 
 
 class Job(BaseModel):
@@ -118,7 +129,7 @@ def create_app(
     lock = threading.Lock()
     shared_store = store or Store(env("SCOUT_DB") or "./data/web.db")
     demo_intel_store = Store(":memory:")  # keeps the week1 -> week2 demo separate from real data
-    make_llm = llm_factory or (lambda: ClaudeLLM(env("SCOUT_MODEL") or "claude-opus-5-5"))
+    new_llm = llm_factory or make_llm
 
     def default_live_sources():
         sources = []
@@ -136,9 +147,13 @@ def create_app(
 
     get_live = live_sources or default_live_sources
 
-    def check_token(x_access_token: str | None = Header(default=None)) -> None:
+    def check_token(
+        x_access_token: str | None = Header(default=None),
+        token: str | None = Query(default=None),  # for download links, which can't set headers
+    ) -> None:
         expected = env("SCOUT_ACCESS_TOKEN")
-        if expected and not secrets.compare_digest(x_access_token or "", expected):
+        given = x_access_token or token or ""
+        if expected and not secrets.compare_digest(given, expected):
             raise HTTPException(401, "Missing or wrong access token")
 
     def submit(kind: str, work: Callable[[], dict[str, Any]]) -> Job:
@@ -170,8 +185,10 @@ def create_app(
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
+        provider = resolve_provider()
         return {
-            "anthropic": bool(env("ANTHROPIC_API_KEY") or env("ANTHROPIC_AUTH_TOKEN")),
+            "llm_provider": provider,
+            "llm_ready": provider_ready(provider) or llm_factory is not None,
             "firecrawl": bool(env("FIRECRAWL_API_KEY")),
             "exa": bool(env("EXA_API_KEY")),
             "token_required": bool(env("SCOUT_ACCESS_TOKEN")),
@@ -192,7 +209,7 @@ def create_app(
                 req.profile,
                 search=search,
                 fetcher=fetcher,
-                llm=make_llm(),
+                llm=new_llm(),
                 store=run_store,
                 min_score=req.min_score,
                 draft=req.draft,
@@ -217,7 +234,7 @@ def create_app(
             monitor = IntelMonitor(
                 req.competitors,
                 fetcher=fetcher,
-                llm=make_llm(),
+                llm=new_llm(),
                 store=run_store,
                 news=news,
                 profile=req.profile,
@@ -233,6 +250,39 @@ def create_app(
         if job is None:
             raise HTTPException(404, "Unknown job")
         return job
+
+    # --- application pipeline ------------------------------------------------
+    @app.get("/api/pipeline", dependencies=[Depends(check_token)])
+    def pipeline() -> list[dict[str, Any]]:
+        return shared_store.list_opportunities(statuses=TRACKED)
+
+    @app.put("/api/pipeline/{key}", dependencies=[Depends(check_token)])
+    def update_pipeline(key: str, body: PipelineUpdate) -> dict[str, Any]:
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        if body.record is not None:
+            if not isinstance(body.record.get("name"), str) or not body.record["name"].strip():
+                raise HTTPException(422, "record.name is required")
+            shared_store.upsert_opportunity(key, {**body.record, "key": key}, now)
+        if not shared_store.set_status(key, body.status, body.notes, now):
+            raise HTTPException(404, "Opportunity not tracked yet: send `record` the first time")
+        return {"key": key, "status": body.status}
+
+    @app.get("/api/pipeline.ics", dependencies=[Depends(check_token)])
+    def pipeline_calendar() -> Response:
+        records = shared_store.list_opportunities(statuses=["saved", "applying"])
+        return Response(
+            to_ics(records),
+            media_type="text/calendar",
+            headers={"Content-Disposition": 'attachment; filename="funding-deadlines.ics"'},
+        )
+
+    @app.get("/api/pipeline.csv", dependencies=[Depends(check_token)])
+    def pipeline_csv() -> Response:
+        return Response(
+            to_csv(shared_store.list_opportunities(statuses=TRACKED)),
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="funding-pipeline.csv"'},
+        )
 
     @app.get("/api/opportunities", dependencies=[Depends(check_token)])
     def tracked(min_score: int = 0) -> list[dict[str, Any]]:

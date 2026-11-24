@@ -57,7 +57,9 @@ def test_index_and_health():
     c = client()
     page = c.get("/")
     assert page.status_code == 200 and "Opportunity Scout" in page.text
-    assert set(c.get("/api/health").json()) == {"anthropic", "firecrawl", "exa", "token_required"}
+    health = c.get("/api/health").json()
+    assert set(health) == {"llm_provider", "llm_ready", "firecrawl", "exa", "token_required"}
+    assert health["llm_ready"] is True  # a test LLM is injected
 
 
 def test_offline_scan_job():

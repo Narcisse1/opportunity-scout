@@ -3,168 +3,367 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Opportunity Scout</title>
+<title>Opportunity Scout — funding finder for startups</title>
+<meta name="description" content="AI analyst that finds grants, accelerators and hackathons your startup is eligible for, drafts the applications, tracks deadlines and watches competitors.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232547d0'/%3E%3Cpath d='M9 21l5-5 3 3 6-7' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root {
-  --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #5d6673; --line: #e2e5ea;
-  --accent: #2f5bea; --accent-ink: #ffffff; --good: #1f8a4c; --warn: #b26a00; --bad: #c0392b;
-  --chip: #eef1f6; --code: #f1f3f6;
+  --bg: #f5f6f8; --surface: #ffffff; --surface-2: #f9fafb; --text: #111827; --muted: #6b7280;
+  --faint: #9ca3af; --line: #e5e7eb; --line-strong: #d1d5db;
+  --brand: #2547d0; --brand-weak: #eef2ff; --brand-ink: #ffffff;
+  --good: #15803d; --good-weak: #dcfce7; --warn: #b45309; --warn-weak: #fef3c7;
+  --bad: #b91c1c; --bad-weak: #fee2e2; --info-weak: #e0f2fe; --info: #0369a1;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+  --radius: 12px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1216; --panel: #171b21; --text: #e6e9ee; --muted: #9aa4b1; --line: #2a313a;
-    --accent: #6f8fff; --accent-ink: #0f1216; --good: #4cc27d; --warn: #e3a33b; --bad: #ef6b5b;
-    --chip: #222831; --code: #1e242c;
+    --bg: #0b0d12; --surface: #13161d; --surface-2: #181c24; --text: #e5e7eb; --muted: #9ca3af;
+    --faint: #6b7280; --line: #262b35; --line-strong: #343a46;
+    --brand: #7c93ff; --brand-weak: #1c2340; --brand-ink: #0b0d12;
+    --good: #4ade80; --good-weak: #12301f; --warn: #fbbf24; --warn-weak: #33270c;
+    --bad: #f87171; --bad-weak: #3a1515; --info-weak: #0c2a3a; --info: #7dd3fc;
+    --shadow: none;
   }
 }
 * { box-sizing: border-box; }
+html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-header { padding: 20px 16px 8px; max-width: 1100px; margin: 0 auto; }
-header h1 { margin: 0; font-size: 22px; }
-header p { margin: 4px 0 0; color: var(--muted); }
-main { max-width: 1100px; margin: 0 auto; padding: 8px 16px 48px; }
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
-.tabs button { background: none; border: 0; padding: 10px 14px; color: var(--muted);
-  font: inherit; cursor: pointer; border-bottom: 2px solid transparent; }
-.tabs button[aria-selected="true"] { color: var(--text); border-color: var(--accent); font-weight: 600; }
-.grid { display: grid; grid-template-columns: 360px 1fr; gap: 16px; align-items: start; }
-@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
-.panel h2 { font-size: 15px; margin: 0 0 12px; }
-label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
-input, textarea, select { width: 100%; padding: 8px 10px; border: 1px solid var(--line);
-  border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
-textarea { resize: vertical; min-height: 64px; }
-.row { display: flex; gap: 8px; align-items: center; }
-.row > * { flex: 1; }
-.check { display: flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--text); font-size: 14px; }
-.check input { width: auto; }
-.btn { margin-top: 14px; width: 100%; padding: 10px; border: 0; border-radius: 6px;
-  background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; }
-.btn:disabled { opacity: .6; cursor: progress; }
-.btn.secondary { background: var(--chip); color: var(--text); width: auto; padding: 6px 12px; margin: 0; font-weight: 500; }
-.status { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 20px; }
-.status.err { color: var(--bad); }
-.summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
-.chip { background: var(--chip); border-radius: 999px; padding: 2px 10px; font-size: 13px; color: var(--muted); }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
-.card.dim { opacity: .65; }
-.card-head { display: flex; gap: 12px; align-items: flex-start; }
-.score { min-width: 48px; height: 48px; border-radius: 8px; display: grid; place-items: center;
-  font-weight: 700; font-size: 18px; color: #fff; }
-.card h3 { margin: 0; font-size: 16px; }
-.card h3 a { color: inherit; }
+  font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased; }
+a { color: var(--brand); text-decoration: none; } a:hover { text-decoration: underline; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar { background: var(--surface); border-right: 1px solid var(--line); padding: 18px 12px;
+  display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; font-weight: 700; font-size: 15px; }
+.brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--brand); display: grid; place-items: center; }
+.brand small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
+.nav-btn { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; border: 0;
+  background: none; color: var(--muted); cursor: pointer; text-align: left; font-weight: 500; }
+.nav-btn:hover { background: var(--surface-2); color: var(--text); }
+.nav-btn[aria-current="page"] { background: var(--brand-weak); color: var(--brand); }
+.nav-btn svg { width: 18px; height: 18px; flex: none; }
+.nav-count { margin-left: auto; font-size: 12px; background: var(--surface-2); border: 1px solid var(--line);
+  padding: 0 7px; border-radius: 999px; color: var(--muted); }
+.sidebar-foot { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--faint); }
+.dot.ok { background: var(--good); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+
+/* Main */
+.main { min-width: 0; }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 18px 28px; border-bottom: 1px solid var(--line);
+  background: var(--surface); position: sticky; top: 0; z-index: 5; }
+.topbar h1 { font-size: 18px; margin: 0; }
+.topbar p { margin: 0; color: var(--muted); font-size: 13px; }
+.topbar .spacer { flex: 1; }
+.content { padding: 24px 28px 64px; max-width: 1280px; }
+.page[hidden] { display: none; }
+
+/* Building blocks */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card-pad { padding: 18px 20px; }
+.card h2 { font-size: 15px; margin: 0 0 4px; }
+.sub { color: var(--muted); font-size: 13px; margin: 0; }
+.grid-2 { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+.stack > * + * { margin-top: 14px; }
+label.field { display: block; font-size: 12.5px; font-weight: 600; color: var(--text); margin: 14px 0 6px; }
+.help { font-size: 12px; color: var(--muted); margin-top: 4px; }
+input[type=text], input[type=number], input[type=password], input:not([type]), textarea, select {
+  width: 100%; padding: 8px 11px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface);
+  outline: none; transition: border-color .15s, box-shadow .15s; }
+input:focus, textarea:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
+textarea { resize: vertical; min-height: 70px; }
+.row { display: flex; gap: 10px; } .row > * { flex: 1; min-width: 0; }
+.toggle { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; cursor: pointer; }
+.toggle input { width: 16px; height: 16px; accent-color: var(--brand); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px;
+  border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer;
+  font-weight: 600; font-size: 13px; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); text-decoration: none; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.block { width: 100%; margin-top: 16px; padding: 10px; }
+.btn.sm { padding: 5px 10px; font-size: 12.5px; }
+.btn.ghost { border-color: transparent; background: none; color: var(--muted); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.btn svg { width: 15px; height: 15px; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.badge.good { background: var(--good-weak); color: var(--good); border-color: transparent; }
+.badge.warn { background: var(--warn-weak); color: var(--warn); border-color: transparent; }
+.badge.bad { background: var(--bad-weak); color: var(--bad); border-color: transparent; }
+.badge.info { background: var(--info-weak); color: var(--info); border-color: transparent; }
+.badge.brand { background: var(--brand-weak); color: var(--brand); border-color: transparent; }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat { padding: 14px 16px; }
+.stat .k { font-size: 12px; color: var(--muted); font-weight: 600; }
+.stat .v { font-size: 22px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+/* Progress */
+.progress { margin-top: 14px; display: none; }
+.progress.on { display: block; }
+.progress-bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--line); }
+.progress-bar span { display: block; height: 100%; width: 35%; background: var(--brand); border-radius: 999px;
+  animation: slide 1.4s ease-in-out infinite; }
+@keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+.progress-text { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.alert { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; }
+.alert.err { background: var(--bad-weak); color: var(--bad); }
+.alert.info { background: var(--info-weak); color: var(--info); }
+.alert.ok { background: var(--good-weak); color: var(--good); }
+
+/* Toolbar */
+.toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.toolbar input { max-width: 260px; } .toolbar select { width: auto; }
+.toolbar .spacer { flex: 1; }
+
+/* Opportunity cards */
+.opp { padding: 16px 18px; margin-bottom: 12px; }
+.opp.muted { opacity: .62; }
+.opp-head { display: flex; gap: 14px; align-items: flex-start; }
+.ring { --p: 0; --c: var(--brand); width: 52px; height: 52px; flex: none; border-radius: 50%;
+  background: conic-gradient(var(--c) calc(var(--p) * 1%), var(--line) 0); display: grid; place-items: center; }
+.ring span { width: 42px; height: 42px; border-radius: 50%; background: var(--surface); display: grid; place-items: center;
+  font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.opp h3 { margin: 0; font-size: 15.5px; line-height: 1.35; }
+.opp h3 a { color: var(--text); }
 .meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
-.card ul { margin: 6px 0; padding-left: 20px; }
-.label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-top: 10px; }
-details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
-summary { cursor: pointer; font-weight: 600; font-size: 14px; }
-.answer { background: var(--code); border-radius: 6px; padding: 10px; margin: 8px 0; white-space: pre-wrap; }
-.answer b { display: block; margin-bottom: 4px; }
-.quote { border-left: 3px solid var(--line); padding-left: 10px; color: var(--muted); margin: 4px 0; font-size: 14px; }
-.headline { font-size: 17px; font-weight: 600; }
-.empty { color: var(--muted); text-align: center; padding: 40px 10px; }
-.pill { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--chip); }
-.pill.high { color: var(--bad); } .pill.medium { color: var(--warn); } .pill.low { color: var(--muted); }
-.hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.opp-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex: none; }
+.opp-actions select { width: auto; padding: 6px 8px; font-size: 12.5px; font-weight: 600; }
+.opp p.summary { margin: 10px 0 0; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 10px; }
+.cols h4 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 4px; }
+.cols ul { margin: 0; padding-left: 18px; }
+.cols li + li { margin-top: 3px; }
+
+/* Empty / onboarding */
+.empty { text-align: center; padding: 44px 24px; }
+.empty h3 { margin: 0 0 6px; font-size: 16px; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 22px; text-align: left; }
+.step { padding: 14px 16px; border: 1px dashed var(--line-strong); border-radius: 10px; }
+.step b { display: block; margin-bottom: 4px; }
+.step .num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--brand-weak); color: var(--brand); font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+
+/* Pipeline board */
+.board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+.col { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; min-height: 160px; }
+.col-head { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; padding: 2px 4px 10px; }
+.pcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; margin-bottom: 8px; box-shadow: var(--shadow); }
+.pcard b { display: block; font-size: 13.5px; line-height: 1.35; }
+.pcard .meta { font-size: 12px; }
+.pcard select { margin-top: 8px; padding: 5px 8px; font-size: 12.5px; }
+.pcard textarea { margin-top: 6px; min-height: 48px; font-size: 12.5px; }
+.pcard-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+
+/* Intel */
+.finding { padding: 12px 0; border-top: 1px solid var(--line); }
+.finding:first-of-type { border-top: 0; }
+.quote { margin-top: 6px; padding: 8px 12px; border-left: 3px solid var(--brand); background: var(--surface-2);
+  border-radius: 0 8px 8px 0; font-size: 13px; color: var(--muted); }
+.headline { font-size: 17px; font-weight: 700; line-height: 1.4; }
+
+/* Profile */
+.meter { height: 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; margin-top: 8px; }
+.meter span { display: block; height: 100%; background: var(--good); transition: width .3s; }
+.section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin: 22px 0 0; }
+
+/* Draft dialog */
+dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(760px, 94vw); max-height: 88vh;
+  background: var(--surface); color: var(--text); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+dialog::backdrop { background: rgba(15,18,25,.45); }
+.dlg-head { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); }
+.dlg-head h3 { margin: 0; font-size: 16px; }
+.dlg-body { padding: 16px 20px 20px; overflow-y: auto; max-height: calc(88vh - 64px); }
+.answer { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+.answer-q { font-weight: 700; margin-bottom: 6px; display: flex; gap: 8px; align-items: flex-start; }
+.answer-q span { flex: 1; }
+.answer-a { white-space: pre-wrap; }
+mark.need { background: var(--warn-weak); color: var(--warn); padding: 0 3px; border-radius: 4px; font-weight: 600; }
+
+/* Toasts */
+#toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
+.toast { background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.2); max-width: 360px; }
+.toast.err { background: var(--bad); color: #fff; }
+
 [hidden] { display: none !important; }
+@media (max-width: 1100px) { .stats { grid-template-columns: repeat(3, 1fr); } .board { grid-template-columns: repeat(5, 240px); } }
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; padding: 10px 16px; }
+  .brand { padding: 4px 8px; width: 100%; } .sidebar-foot { display: none; }
+  .grid-2 { grid-template-columns: 1fr; } .steps { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, 1fr); } .content, .topbar { padding-left: 16px; padding-right: 16px; }
+  .opp-head { flex-wrap: wrap; } .opp-actions { margin-left: 0; width: 100%; }
+}
 </style>
 </head>
 <body>
-<header>
-  <h1>Opportunity Scout</h1>
-  <p>AI research analyst: finds grants, accelerators &amp; hackathons that fit your startup, drafts the applications, and watches your competitors.</p>
-</header>
-<main>
-  <nav class="tabs" role="tablist">
-    <button role="tab" aria-selected="true" data-tab="opps">Opportunities</button>
-    <button role="tab" aria-selected="false" data-tab="intel">Competitor intel</button>
-    <button role="tab" aria-selected="false" data-tab="profile">Startup profile</button>
-  </nav>
-
-  <!-- Opportunities -->
-  <section id="tab-opps" class="grid">
-    <div class="panel">
-      <h2>Scan for opportunities</h2>
-      <label for="queries">Search queries (one per line)</label>
-      <textarea id="queries" rows="6"></textarea>
-      <div class="row">
-        <div><label for="minScore">Shortlist at score</label><input id="minScore" type="number" min="0" max="100" value="60"></div>
-        <div><label for="perQuery">Results / query</label><input id="perQuery" type="number" min="1" max="10" value="5"></div>
-      </div>
-      <label class="check"><input id="draft" type="checkbox" checked> Draft application answers</label>
-      <label class="check"><input id="oppOffline" type="checkbox"> Offline demo (sample pages, no web search)</label>
-      <button class="btn" id="runOpps">Run scan</button>
-      <div class="status" id="oppStatus"></div>
-      <p class="hint">Uses the profile from the "Startup profile" tab. A live scan takes a few minutes.</p>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 32 32" width="20" height="20"><path d="M7 22l6-6 4 4 8-9" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div>Opportunity Scout<small>Funding finder for startups</small></div>
     </div>
-    <div id="oppResults"><div class="empty">Run a scan to see scored opportunities here.</div></div>
-  </section>
-
-  <!-- Intel -->
-  <section id="tab-intel" class="grid" hidden>
-    <div class="panel">
-      <h2>Competitors</h2>
-      <label for="competitors">One block per competitor</label>
-      <textarea id="competitors" rows="9"></textarea>
-      <p class="hint">Format: <code>name: RivalAI</code>, <code>news: RivalAI funding</code>, then <code>pricing = https://…</code> per tracked page. Separate competitors with a blank line.</p>
-      <label class="check"><input id="intelOffline" type="checkbox"> Offline demo</label>
-      <div class="row" id="fixtureRow" hidden>
-        <div><label for="fixtureSet">Demo week</label>
-          <select id="fixtureSet"><option value="week1">Week 1 (baseline)</option><option value="week2">Week 2 (changes)</option></select></div>
-      </div>
-      <button class="btn" id="runIntel">Check competitors</button>
-      <div class="status" id="intelStatus"></div>
-      <p class="hint">The first run of each page saves a baseline; later runs report what changed.</p>
+    <button class="nav-btn" data-page="discover" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Discover</button>
+    <button class="nav-btn" data-page="pipeline">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg>Pipeline<span class="nav-count" id="pipelineCount">0</span></button>
+    <button class="nav-btn" data-page="intel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Competitors</button>
+    <button class="nav-btn" data-page="profile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6"/></svg>Startup profile</button>
+    <div class="sidebar-foot">
+      <div id="statusModel"><span class="dot"></span>Checking server…</div>
+      <div id="statusSearch" style="margin-top:4px"></div>
+      <div style="margin-top:10px"><a href="https://github.com/Narcisse1/opportunity-scout" target="_blank" rel="noopener">Source on GitHub</a></div>
     </div>
-    <div id="intelResults"><div class="empty">Run a check to see the competitor briefing here.</div></div>
-  </section>
+  </aside>
 
-  <!-- Profile -->
-  <section id="tab-profile" hidden>
-    <div class="panel">
-      <h2>Startup profile</h2>
-      <p class="hint">Saved in this browser only. Drafted answers use only these facts — anything missing becomes a <code>[[NEEDS: …]]</code> placeholder.</p>
-      <div class="row">
-        <div><label for="p-name">Startup name</label><input id="p-name"></div>
-        <div><label for="p-stage">Stage</label><input id="p-stage" placeholder="pre-seed, seed…"></div>
-        <div><label for="p-country">Country</label><input id="p-country"></div>
-      </div>
-      <label for="p-one_liner">One-liner</label><input id="p-one_liner">
-      <label for="p-description">Description</label><textarea id="p-description"></textarea>
-      <div class="row">
-        <div><label for="p-sectors">Sectors (comma separated)</label><input id="p-sectors"></div>
-        <div><label for="p-regions_served">Regions served (comma separated)</label><input id="p-regions_served"></div>
-      </div>
-      <div class="row">
-        <div><label for="p-founded_year">Founded year</label><input id="p-founded_year" type="number"></div>
-        <div><label for="p-funding_raised">Funding raised</label><input id="p-funding_raised"></div>
-      </div>
-      <label for="p-team">Team (one per line)</label><textarea id="p-team"></textarea>
-      <label for="p-traction">Traction (one per line)</label><textarea id="p-traction"></textarea>
-      <label for="p-goals">Goals (one per line)</label><textarea id="p-goals"></textarea>
-      <label for="p-exclude_keywords">Exclude keywords (comma separated)</label><input id="p-exclude_keywords">
-      <button class="btn" id="saveProfile" style="width:auto;padding:8px 18px">Save profile</button>
-      <span class="status" id="profileStatus"></span>
+  <div class="main">
+    <header class="topbar">
+      <div><h1 id="pageTitle">Discover funding</h1><p id="pageSub">Find grants, accelerators and hackathons your startup can actually win.</p></div>
+      <div class="spacer"></div>
+      <div id="tokenWrap" hidden style="width:220px"><input id="token" type="password" placeholder="Access token" autocomplete="off" aria-label="Access token"></div>
+    </header>
+
+    <div class="content">
+      <!-- DISCOVER -->
+      <section class="page" id="page-discover">
+        <div class="grid-2">
+          <div class="card card-pad">
+            <h2>New scan</h2>
+            <p class="sub">Searches the web, reads each page, checks eligibility against your profile and drafts applications for the best fits.</p>
+            <label class="field" for="queries">What to search for</label>
+            <textarea id="queries" rows="6"></textarea>
+            <div class="help">One search per line. Mention your sector, region and the kind of program.</div>
+            <div class="row">
+              <div><label class="field" for="minScore">Shortlist from score</label><input id="minScore" type="number" min="0" max="100" value="60"></div>
+              <div><label class="field" for="perQuery">Pages per search</label><input id="perQuery" type="number" min="1" max="10" value="5"></div>
+            </div>
+            <label class="toggle"><input id="draft" type="checkbox" checked> Draft application answers</label>
+            <label class="toggle"><input id="oppOffline" type="checkbox"> Demo mode (sample pages, no web search)</label>
+            <button class="btn primary block" id="runOpps">Find opportunities</button>
+            <div class="progress" id="oppProgress"><div class="progress-bar"><span></span></div><div class="progress-text" id="oppProgressText"></div></div>
+            <div id="oppAlert"></div>
+          </div>
+
+          <div>
+            <div class="stats" id="oppStats" hidden></div>
+            <div class="toolbar" id="oppToolbar" hidden>
+              <input id="oppFilter" placeholder="Filter by name, organizer…" aria-label="Filter results">
+              <select id="oppType" aria-label="Type"><option value="">All types</option></select>
+              <select id="oppSort" aria-label="Sort"><option value="score">Best fit first</option><option value="deadline">Closing soonest</option></select>
+              <label class="toggle" style="margin:0"><input id="showAll" type="checkbox"> Show filtered out</label>
+              <div class="spacer"></div>
+              <button class="btn sm" id="oppDownload">Export report</button>
+            </div>
+            <div id="oppResults"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PIPELINE -->
+      <section class="page" id="page-pipeline" hidden>
+        <div class="stats" id="pipeStats"></div>
+        <div class="toolbar">
+          <span class="sub">Move opportunities through your application process. Deadlines sync to your calendar.</span>
+          <div class="spacer"></div>
+          <a class="btn sm" id="icsLink" href="/api/pipeline.ics">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>Add deadlines to calendar</a>
+          <a class="btn sm" id="csvLink" href="/api/pipeline.csv">Export CSV</a>
+        </div>
+        <div class="board" id="board"></div>
+      </section>
+
+      <!-- INTEL -->
+      <section class="page" id="page-intel" hidden>
+        <div class="grid-2">
+          <div class="card card-pad">
+            <h2>Tracked competitors</h2>
+            <p class="sub">Pricing, changelog and news are checked for meaningful changes. Every finding must quote its source.</p>
+            <label class="field" for="competitors">Competitors</label>
+            <textarea id="competitors" rows="10" spellcheck="false" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px"></textarea>
+            <div class="help"><code>name: …</code>, optional <code>news: search terms</code>, then one <code>label = https://…</code> per page. Blank line between competitors.</div>
+            <label class="toggle"><input id="intelOffline" type="checkbox"> Demo mode</label>
+            <div id="fixtureRow" hidden>
+              <label class="field" for="fixtureSet">Demo week</label>
+              <select id="fixtureSet"><option value="week1">Week 1 — save baseline</option><option value="week2">Week 2 — detect changes</option></select>
+            </div>
+            <button class="btn primary block" id="runIntel">Check competitors</button>
+            <div class="progress" id="intelProgress"><div class="progress-bar"><span></span></div><div class="progress-text" id="intelProgressText"></div></div>
+            <div id="intelAlert"></div>
+          </div>
+          <div id="intelResults"></div>
+        </div>
+      </section>
+
+      <!-- PROFILE -->
+      <section class="page" id="page-profile" hidden>
+        <div class="grid-2">
+          <div class="card card-pad">
+            <h2>Profile strength</h2>
+            <p class="sub">Eligibility checks and drafted answers use only what you write here. Missing facts become <mark class="need">[[NEEDS: …]]</mark> placeholders instead of invented claims.</p>
+            <div class="meter"><span id="meterBar" style="width:0%"></span></div>
+            <div class="help" id="meterText"></div>
+            <ul id="meterTips" class="help" style="padding-left:18px"></ul>
+          </div>
+          <div class="card card-pad">
+            <div class="section-title" style="margin-top:0">Basics</div>
+            <div class="row">
+              <div><label class="field" for="p-name">Startup name *</label><input id="p-name"></div>
+              <div><label class="field" for="p-stage">Stage</label>
+                <select id="p-stage"><option value="">—</option><option>idea</option><option>pre-seed</option><option>seed</option><option>series A</option><option>series B+</option></select></div>
+            </div>
+            <label class="field" for="p-one_liner">One-liner *</label><input id="p-one_liner" placeholder="What you do, for whom">
+            <label class="field" for="p-description">Description</label><textarea id="p-description" placeholder="Problem, solution, how it works"></textarea>
+            <div class="section-title">Eligibility</div>
+            <div class="row">
+              <div><label class="field" for="p-country">Country of incorporation / HQ</label><input id="p-country"></div>
+              <div><label class="field" for="p-founded_year">Founded</label><input id="p-founded_year" type="number" min="1990" max="2100"></div>
+            </div>
+            <div class="row">
+              <div><label class="field" for="p-sectors">Sectors</label><input id="p-sectors" placeholder="agritech, AI"></div>
+              <div><label class="field" for="p-regions_served">Regions served</label><input id="p-regions_served" placeholder="West Africa, Europe"></div>
+            </div>
+            <label class="field" for="p-funding_raised">Funding raised so far</label><input id="p-funding_raised" placeholder="$0 (bootstrapped)">
+            <div class="section-title">Evidence</div>
+            <label class="field" for="p-team">Team</label><textarea id="p-team" placeholder="One person per line: role and relevant background"></textarea>
+            <label class="field" for="p-traction">Traction</label><textarea id="p-traction" placeholder="One per line: users, pilots, revenue, partnerships"></textarea>
+            <label class="field" for="p-goals">What you're looking for</label><textarea id="p-goals" placeholder="One per line: non-dilutive funding, cloud credits, mentorship…"></textarea>
+            <label class="field" for="p-exclude_keywords">Never show opportunities mentioning</label><input id="p-exclude_keywords" placeholder="crypto, token sale">
+            <div class="help">Comma-separated lists for sectors, regions and exclusions. Saved in this browser only.</div>
+            <div style="margin-top:16px;display:flex;gap:10px"><button class="btn primary" id="saveProfile">Save profile</button><button class="btn ghost" id="resetProfile">Load example</button></div>
+          </div>
+        </div>
+      </section>
     </div>
-  </section>
-
-  <div class="panel" id="tokenPanel" hidden style="margin-top:16px">
-    <label for="token">Access token (required by this server)</label>
-    <input id="token" type="password" autocomplete="off">
   </div>
-</main>
+</div>
+
+<dialog id="draftDialog">
+  <div class="dlg-head"><h3 id="draftTitle">Draft application</h3><div style="flex:1"></div>
+    <button class="btn sm" id="copyAll">Copy all</button><button class="btn sm ghost" id="closeDraft" aria-label="Close">✕</button></div>
+  <div class="dlg-body" id="draftBody"></div>
+</dialog>
+<div id="toasts" aria-live="polite"></div>
 
 <script>
 (() => {
+  "use strict";
   const $ = (id) => document.getElementById(id);
-  const store = {
+  const ls = {
     get(k, d) { try { const v = localStorage.getItem("scout:" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem("scout:" + k, JSON.stringify(v)); } catch {} },
   };
 
-  // Safe DOM builder: text is always set via textContent, never innerHTML.
+  // DOM builder: text always goes through text nodes, never innerHTML (scraped content is untrusted).
   function el(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
@@ -173,7 +372,7 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
       else if (k === "style") node.style.cssText = v;
       else if (k === "href") { if (/^https?:\/\//i.test(v)) { node.href = v; node.target = "_blank"; node.rel = "noopener noreferrer"; } }
       else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
-      else node.setAttribute(k, v);
+      else node.setAttribute(k, v === true ? "" : v);
     }
     for (const c of children.flat()) {
       if (c === null || c === undefined || c === false) continue;
@@ -182,160 +381,332 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
     return node;
   }
   const list = (items) => items && items.length ? el("ul", {}, items.map((i) => el("li", {}, i))) : null;
+  function toast(msg, err = false) {
+    const t = el("div", { class: "toast" + (err ? " err" : "") }, msg);
+    $("toasts").append(t); setTimeout(() => t.remove(), 3500);
+  }
+  function alertBox(target, kind, msg) { $(target).replaceChildren(msg ? el("div", { class: "alert " + kind }, msg) : ""); }
+  const daysLeft = (d) => { if (!d) return null; const t = new Date(d + "T23:59:59"); return isNaN(t) ? null : Math.ceil((t - new Date()) / 86400000); };
+  function deadlineBadge(deadline) {
+    const d = daysLeft(deadline);
+    if (d === null) return el("span", { class: "badge" }, "Rolling / no deadline");
+    if (d < 0) return el("span", { class: "badge bad" }, `Closed ${deadline}`);
+    const cls = d <= 14 ? "bad" : d <= 30 ? "warn" : "info";
+    return el("span", { class: "badge " + cls }, d === 0 ? "Closes today" : `Closes in ${d} day${d === 1 ? "" : "s"}`);
+  }
+  const scoreColor = (s) => s >= 75 ? "var(--good)" : s >= 50 ? "var(--warn)" : "var(--bad)";
+  const VERDICT = { strong: "good", possible: "warn", poor: "bad", ineligible: "bad" };
+  const STATUSES = [["saved", "Saved"], ["applying", "Applying"], ["submitted", "Submitted"], ["won", "Won"], ["lost", "Not selected"]];
+  const STATUS_LABEL = Object.fromEntries([["new", "Track…"], ...STATUSES, ["dismissed", "Dismissed"]]);
 
-  // Tabs
-  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
-    document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
-    for (const t of ["opps", "intel", "profile"]) $("tab-" + t).hidden = t !== b.dataset.tab;
-    store.set("tab", b.dataset.tab);
-  }));
-  const lastTab = store.get("tab", "opps");
-  document.querySelector(`.tabs button[data-tab="${lastTab}"]`)?.click();
-
-  // Profile
-  const DEFAULT_PROFILE = {
-    name: "Example Startup", one_liner: "AI assistant that diagnoses crop disease from a phone photo for smallholder farmers.",
-    description: "", stage: "pre-seed", sectors: ["agritech", "AI"], country: "Cameroon", regions_served: ["Central Africa"],
-    founded_year: 2025, team: ["Founder/CTO: software engineer"], funding_raised: "$0", traction: ["Pilot with 40 farmers"],
-    goals: ["non-dilutive funding", "cloud credits"], exclude_keywords: ["crypto"],
+  // ---------------------------------------------------------------- navigation
+  const PAGES = {
+    discover: ["Discover funding", "Find grants, accelerators and hackathons your startup can actually win."],
+    pipeline: ["Application pipeline", "Everything you're tracking, by stage, with deadlines."],
+    intel: ["Competitor intelligence", "What changed at your competitors, with quoted evidence."],
+    profile: ["Startup profile", "The facts used for eligibility checks and drafted answers."],
   };
-  const LIST_COMMA = ["sectors", "regions_served", "exclude_keywords"];
-  const LIST_LINES = ["team", "traction", "goals"];
+  function go(page) {
+    document.querySelectorAll(".nav-btn").forEach((b) => {
+      if (b.dataset.page === page) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
+    for (const p of Object.keys(PAGES)) $("page-" + p).hidden = p !== page;
+    [$("pageTitle").textContent, $("pageSub").textContent] = PAGES[page];
+    ls.set("page", page);
+    if (page === "pipeline") loadPipeline();
+  }
+  document.querySelectorAll(".nav-btn").forEach((b) => b.addEventListener("click", () => go(b.dataset.page)));
+
+  // ---------------------------------------------------------------- API
+  const token = () => $("token").value.trim();
+  $("token").value = ls.get("token", "");
+  $("token").addEventListener("change", () => { ls.set("token", token()); refreshLinks(); loadPipeline(); });
+  async function api(path, { method = "GET", body } = {}) {
+    const headers = { "Content-Type": "application/json" };
+    if (token()) headers["X-Access-Token"] = token();
+    const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = typeof data.detail === "string" ? data.detail
+        : Array.isArray(data.detail) ? data.detail.map((d) => `${(d.loc || []).slice(1).join(".")}: ${d.msg}`).join("; ") : res.statusText;
+      throw new Error(res.status === 401 ? "This server needs an access token — enter it at the top right." : (detail || `HTTP ${res.status}`));
+    }
+    return data;
+  }
+  const PHASES = ["Searching the web…", "Reading pages…", "Extracting opportunities…", "Checking eligibility against your profile…", "Drafting applications…"];
+  async function runJob(path, body, prefix, button) {
+    button.disabled = true; alertBox(prefix + "Alert", "", "");
+    $(prefix + "Progress").classList.add("on");
+    const started = Date.now();
+    try {
+      let job = await api(path, { method: "POST", body });
+      while (job.status === "queued" || job.status === "running") {
+        const s = Math.round((Date.now() - started) / 1000);
+        $(prefix + "ProgressText").textContent = `${PHASES[Math.min(Math.floor(s / 20), PHASES.length - 1)]} ${s}s`;
+        await new Promise((r) => setTimeout(r, 2000));
+        job = await api(`/api/jobs/${job.id}`);
+      }
+      if (job.status === "error") throw new Error(job.error);
+      return job.result;
+    } catch (e) { alertBox(prefix + "Alert", "err", e.message); return null; }
+    finally { button.disabled = false; $(prefix + "Progress").classList.remove("on"); }
+  }
+  function download(name, text, type = "text/markdown") {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // ---------------------------------------------------------------- profile
+  const EXAMPLE = {
+    name: "Example Startup", one_liner: "AI assistant that diagnoses crop disease from a phone photo for smallholder farmers.",
+    description: "Farmers send a photo over WhatsApp; a vision model identifies likely diseases and replies with treatment advice in their language.",
+    stage: "pre-seed", sectors: ["agritech", "AI"], country: "Cameroon", regions_served: ["Central Africa"], founded_year: 2025,
+    team: ["Founder/CTO: software engineer, builds the AI pipeline"], funding_raised: "$0 (bootstrapped)",
+    traction: ["Pilot with 40 farmers"], goals: ["non-dilutive funding", "cloud credits", "mentorship"], exclude_keywords: ["crypto"],
+  };
+  const COMMA = ["sectors", "regions_served", "exclude_keywords"], LINES = ["team", "traction", "goals"];
   function fillProfile(p) {
     for (const [k, v] of Object.entries(p)) {
       const input = $("p-" + k); if (!input) continue;
-      input.value = Array.isArray(v) ? v.join(LIST_COMMA.includes(k) ? ", " : "\n") : (v ?? "");
+      input.value = Array.isArray(v) ? v.join(COMMA.includes(k) ? ", " : "\n") : (v ?? "");
     }
+    updateMeter();
   }
   function readProfile() {
     const p = {};
-    for (const k of Object.keys(DEFAULT_PROFILE)) {
+    for (const k of Object.keys(EXAMPLE)) {
       const raw = $("p-" + k).value.trim();
-      if (LIST_COMMA.includes(k)) p[k] = raw.split(",").map((s) => s.trim()).filter(Boolean);
-      else if (LIST_LINES.includes(k)) p[k] = raw.split("\n").map((s) => s.trim()).filter(Boolean);
+      if (COMMA.includes(k)) p[k] = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      else if (LINES.includes(k)) p[k] = raw.split("\n").map((s) => s.trim()).filter(Boolean);
       else if (k === "founded_year") p[k] = raw ? Number(raw) : null;
       else p[k] = raw;
     }
     return p;
   }
-  fillProfile(store.get("profile", DEFAULT_PROFILE));
+  const CHECKS = [
+    ["name", "Add your startup's name"], ["one_liner", "Add a one-liner"], ["description", "Describe the problem and solution"],
+    ["stage", "Set your stage — many programs are stage-specific"], ["country", "Add your country — most grants are location-restricted"],
+    ["sectors", "List your sectors"], ["founded_year", "Add your founding year"], ["team", "Describe the team"],
+    ["traction", "Add traction — it's asked in nearly every application"], ["goals", "Say what you're looking for"],
+  ];
+  function updateMeter() {
+    const p = readProfile();
+    const missing = CHECKS.filter(([k]) => Array.isArray(p[k]) ? !p[k].length : !p[k]);
+    const pct = Math.round(((CHECKS.length - missing.length) / CHECKS.length) * 100);
+    $("meterBar").style.width = pct + "%";
+    $("meterText").textContent = `${pct}% complete`;
+    $("meterTips").replaceChildren(...missing.slice(0, 4).map(([, tip]) => el("li", {}, tip)));
+  }
+  document.querySelectorAll("[id^='p-']").forEach((i) => i.addEventListener("input", updateMeter));
+  fillProfile(ls.get("profile", EXAMPLE));
   $("saveProfile").addEventListener("click", () => {
     const p = readProfile();
-    if (!p.name || !p.one_liner) { $("profileStatus").textContent = "Name and one-liner are required."; return; }
-    store.set("profile", p); $("profileStatus").textContent = "Saved.";
+    if (!p.name || !p.one_liner) { toast("Name and one-liner are required", true); return; }
+    ls.set("profile", p); toast("Profile saved");
   });
+  $("resetProfile").addEventListener("click", () => { fillProfile(EXAMPLE); toast("Example loaded — edit it and save"); });
+  const profile = () => ls.get("profile", EXAMPLE);
 
-  // Defaults for the other forms
-  $("queries").value = store.get("queries", [
+  // ---------------------------------------------------------------- pipeline state
+  let tracked = new Map(); // key -> record
+  async function loadPipeline() {
+    try {
+      const rows = await api("/api/pipeline");
+      tracked = new Map(rows.map((r) => [r.key, r]));
+      $("pipelineCount").textContent = rows.length;
+      renderBoard(rows);
+      if (lastScan) renderOpps();
+    } catch (e) { $("board").replaceChildren(el("div", { class: "alert err" }, e.message)); }
+  }
+  async function setStatus(record, status, notes) {
+    const body = { status };
+    if (notes !== undefined) body.notes = notes;
+    if (!tracked.has(record.key)) body.record = record;
+    try {
+      await api(`/api/pipeline/${encodeURIComponent(record.key)}`, { method: "PUT", body });
+      if (status !== "new") toast(status === "dismissed" ? "Removed from pipeline" : `Moved to ${STATUS_LABEL[status]}`);
+      await loadPipeline();
+    } catch (e) { toast(e.message, true); }
+  }
+  function statusSelect(record) {
+    const current = tracked.get(record.key)?.status || "new";
+    const sel = el("select", { "aria-label": "Pipeline status", onchange: (e) => setStatus(record, e.target.value) },
+      el("option", { value: "new", disabled: true }, "Track…"),
+      STATUSES.map(([v, label]) => el("option", { value: v }, label)),
+      current !== "new" ? el("option", { value: "dismissed" }, "Remove") : null);
+    sel.value = current === "dismissed" ? "new" : current;
+    return sel;
+  }
+  function refreshLinks() {
+    const q = token() ? `?token=${encodeURIComponent(token())}` : "";
+    $("icsLink").href = "/api/pipeline.ics" + q; $("csvLink").href = "/api/pipeline.csv" + q;
+  }
+
+  function renderBoard(rows) {
+    const active = rows.filter((r) => ["saved", "applying"].includes(r.status));
+    const upcoming = active.map((r) => [r, daysLeft(r.deadline)]).filter(([, d]) => d !== null && d >= 0).sort((a, b) => a[1] - b[1]);
+    const next = upcoming[0];
+    $("pipeStats").replaceChildren(
+      stat("Tracked", rows.length), stat("In progress", active.length),
+      stat("Submitted", rows.filter((r) => r.status === "submitted").length),
+      stat("Won", rows.filter((r) => r.status === "won").length),
+      stat("Next deadline", next ? `${next[1]}d` : "—", next ? next[0].name : null));
+    if (!rows.length) {
+      $("board").replaceChildren(el("div", { class: "card empty", style: "grid-column:1/-1" },
+        el("h3", {}, "Nothing tracked yet"),
+        el("p", { class: "sub" }, "Run a scan on the Discover page and choose “Saved” on any opportunity to start your pipeline."),
+        el("button", { class: "btn primary", style: "margin-top:14px", onclick: () => go("discover") }, "Find opportunities")));
+      return;
+    }
+    $("board").replaceChildren(...STATUSES.map(([status, label]) => {
+      const items = rows.filter((r) => r.status === status);
+      return el("div", { class: "col" },
+        el("div", { class: "col-head" }, label, el("span", { class: "nav-count" }, items.length)),
+        items.map(pipelineCard));
+    }));
+  }
+  function pipelineCard(r) {
+    let timer;
+    const notes = el("textarea", { placeholder: "Notes: contacts, to-dos…", "aria-label": "Notes" });
+    notes.value = r.notes || "";
+    notes.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => saveNotes(r, notes.value), 800); });
+    return el("div", { class: "pcard" },
+      el("b", {}, r.url ? el("a", { href: r.url }, r.name) : r.name),
+      el("div", { class: "meta" }, [r.organizer, r.type].filter(Boolean).join(" · ")),
+      el("div", { class: "pcard-foot" }, deadlineBadge(r.deadline),
+        r.score ? el("span", { class: "badge", title: "Fit score" }, `${r.score}/100`) : null),
+      statusSelect(r), notes,
+      r.draft ? el("button", { class: "btn sm ghost", style: "margin-top:6px;padding-left:0", onclick: () => openDraft(r) }, "View draft answers") : null);
+  }
+  async function saveNotes(r, text) {
+    try { await api(`/api/pipeline/${encodeURIComponent(r.key)}`, { method: "PUT", body: { status: r.status, notes: text } }); r.notes = text; }
+    catch (e) { toast(e.message, true); }
+  }
+  function stat(k, v, title) { return el("div", { class: "card stat", title: title || null }, el("div", { class: "k" }, k), el("div", { class: "v" }, v)); }
+
+  // ---------------------------------------------------------------- discover
+  $("queries").value = ls.get("queries", [
     "AI startup grant applications open 2027",
     "pre-seed accelerator applications open Africa AI startups",
     "AI agents hackathon 2027 prize registration",
+    "non-dilutive funding agritech startups Africa",
   ].join("\n"));
-  $("competitors").value = store.get("competitors",
-    "name: RivalAI\nnews: RivalAI\npricing = https://rival.example.com/pricing\nchangelog = https://rival.example.com/changelog");
-  $("intelOffline").addEventListener("change", () => { $("fixtureRow").hidden = !$("intelOffline").checked; });
+  let lastScan = null;
+  function onboarding() {
+    return el("div", { class: "card empty" },
+      el("h3", {}, "Stop hunting for funding across 50 websites"),
+      el("p", { class: "sub" }, "Opportunity Scout reads the programs for you, rules out the ones you can't win, and writes first drafts of the applications."),
+      el("div", { class: "steps" },
+        el("div", { class: "step" }, el("div", { class: "num" }, "1"), el("b", {}, "Describe your startup"), el("span", { class: "sub" }, "Country, stage, sector and traction decide eligibility.")),
+        el("div", { class: "step" }, el("div", { class: "num" }, "2"), el("b", {}, "Run a scan"), el("span", { class: "sub" }, "Every result is scored for fit, with reasons and blockers.")),
+        el("div", { class: "step" }, el("div", { class: "num" }, "3"), el("b", {}, "Track & apply"), el("span", { class: "sub" }, "Use the drafts, move items through your pipeline, sync deadlines.")),
+      ),
+      el("div", { style: "margin-top:18px;display:flex;gap:10px;justify-content:center" },
+        el("button", { class: "btn", onclick: () => go("profile") }, "Edit profile"),
+        el("button", { class: "btn primary", onclick: () => { $("oppOffline").checked = true; $("runOpps").click(); } }, "Try the demo")));
+  }
+  $("oppResults").replaceChildren(onboarding());
 
-  // API
-  async function api(path, body) {
-    const headers = { "Content-Type": "application/json" };
-    const token = $("token").value.trim();
-    if (token) headers["X-Access-Token"] = token;
-    const res = await fetch(path, { method: body ? "POST" : "GET", headers, body: body ? JSON.stringify(body) : undefined });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const detail = typeof data.detail === "string" ? data.detail
-        : Array.isArray(data.detail) ? data.detail.map((d) => `${d.loc?.slice(1).join(".")}: ${d.msg}`).join("; ")
-        : res.statusText;
-      throw new Error(detail || `HTTP ${res.status}`);
-    }
-    return data;
-  }
-  async function runJob(path, body, statusEl, button) {
-    button.disabled = true; statusEl.className = "status"; statusEl.textContent = "Starting…";
-    const started = Date.now();
-    try {
-      let job = await api(path, body);
-      while (job.status === "queued" || job.status === "running") {
-        statusEl.textContent = `Working… ${Math.round((Date.now() - started) / 1000)}s (searching, reading pages, scoring)`;
-        await new Promise((r) => setTimeout(r, 2000));
-        job = await api(`/api/jobs/${job.id}`);
-      }
-      if (job.status === "error") throw new Error(job.error);
-      const u = job.result.usage || {};
-      statusEl.textContent = `Done in ${Math.round((Date.now() - started) / 1000)}s · ${u.calls ?? 0} model calls · ~$${(u.estimated_cost_usd ?? 0).toFixed(3)}`;
-      return job.result;
-    } catch (e) {
-      statusEl.className = "status err"; statusEl.textContent = e.message; return null;
-    } finally { button.disabled = false; }
-  }
-  function download(name, text) {
-    const a = el("a", {}); a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
-    a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }
-  const scoreColor = (s) => s >= 75 ? "var(--good)" : s >= 50 ? "var(--warn)" : "var(--bad)";
-
-  // Opportunities
   $("runOpps").addEventListener("click", async () => {
     const queries = $("queries").value.split("\n").map((s) => s.trim()).filter(Boolean);
-    store.set("queries", $("queries").value);
+    if (!queries.length) { alertBox("oppAlert", "err", "Add at least one search."); return; }
+    ls.set("queries", $("queries").value);
     const result = await runJob("/api/opportunities/scan", {
-      profile: store.get("profile", DEFAULT_PROFILE), queries,
-      min_score: Number($("minScore").value), results_per_query: Number($("perQuery").value),
+      profile: profile(), queries, min_score: Number($("minScore").value), results_per_query: Number($("perQuery").value),
       draft: $("draft").checked, offline: $("oppOffline").checked,
-    }, $("oppStatus"), $("runOpps"));
-    if (result) renderOpps(result);
+    }, "opp", $("runOpps"));
+    if (!result) return;
+    lastScan = result;
+    const types = [...new Set(result.opportunities.map((o) => o.type))].sort();
+    $("oppType").replaceChildren(el("option", { value: "" }, "All types"), types.map((t) => el("option", { value: t }, t)));
+    const u = result.usage || {};
+    alertBox("oppAlert", "ok", `Done · ${u.calls ?? 0} AI calls · est. $${(u.estimated_cost_usd ?? 0).toFixed(3)}`);
+    renderOpps();
   });
+  ["oppFilter", "oppType", "oppSort", "showAll"].forEach((id) => $(id).addEventListener("input", () => lastScan && renderOpps()));
+  $("oppDownload").addEventListener("click", () => lastScan && download("opportunities.md", lastScan.markdown));
 
-  function renderOpps(r) {
+  function renderOpps() {
+    const r = lastScan;
+    const short = r.opportunities.filter((o) => o.shortlisted);
+    const closing = short.filter((o) => { const d = daysLeft(o.deadline); return d !== null && d >= 0 && d <= 30; });
+    $("oppStats").hidden = false; $("oppToolbar").hidden = false;
+    $("oppStats").replaceChildren(stat("Pages read", r.documents_processed), stat("Opportunities", r.opportunities.length),
+      stat("Shortlisted", short.length), stat("Closing ≤ 30 days", closing.length),
+      stat("Run cost", `$${(r.usage?.estimated_cost_usd ?? 0).toFixed(2)}`));
+    const q = $("oppFilter").value.toLowerCase(), type = $("oppType").value;
+    let items = r.opportunities.filter((o) => $("showAll").checked || o.shortlisted)
+      .filter((o) => !type || o.type === type)
+      .filter((o) => !q || `${o.name} ${o.organizer || ""} ${o.opportunity.summary}`.toLowerCase().includes(q));
+    items.sort($("oppSort").value === "deadline"
+      ? (a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999")
+      : (a, b) => b.score - a.score);
     const box = $("oppResults"); box.replaceChildren();
-    const shortlisted = r.opportunities.filter((o) => o.shortlisted);
-    box.append(el("div", { class: "summary" },
-      el("span", { class: "chip" }, `${r.documents_found} results`),
-      el("span", { class: "chip" }, `${r.documents_processed} new pages read`),
-      el("span", { class: "chip" }, `${shortlisted.length} shortlisted`),
-      el("button", { class: "btn secondary", onclick: () => download("opportunities.md", r.markdown) }, "Download Markdown"),
-    ));
-    if (!r.opportunities.length) box.append(el("div", { class: "empty" }, "No new opportunities found. Try different queries."));
-    for (const o of r.opportunities) box.append(oppCard(o));
-    if (r.errors.length) box.append(el("div", { class: "card" }, el("div", { class: "label" }, "Errors"), list(r.errors)));
+    if (!items.length) {
+      box.append(el("div", { class: "card empty" }, el("h3", {}, r.opportunities.length ? "Nothing matches these filters" : "No new opportunities found"),
+        el("p", { class: "sub" }, r.opportunities.length ? "Turn on “Show filtered out” to see programs that didn't make the shortlist." : "Pages you've already scanned are skipped. Try new or broader searches.")));
+    }
+    items.forEach((o) => box.append(oppCard(o)));
+    if (r.errors.length) box.append(el("details", { class: "card card-pad" }, el("summary", {}, `${r.errors.length} page(s) couldn't be processed`), list(r.errors)));
   }
 
   function oppCard(o) {
-    const opp = o.opportunity, fit = o.fit, draft = o.draft;
-    const rejected = o.rejected && o.rejected.length;
-    const days = opp.deadline ? Math.round((new Date(opp.deadline) - new Date()) / 86400000) : null;
-    const card = el("div", { class: "card" + (o.shortlisted ? "" : " dim") },
-      el("div", { class: "card-head" },
-        el("div", { class: "score", style: `background:${rejected ? "var(--muted)" : scoreColor(o.score)}` }, rejected ? "—" : o.score),
-        el("div", {},
+    const opp = o.opportunity, fit = o.fit, rejected = o.rejected && o.rejected.length;
+    const ring = el("div", { class: "ring", style: `--p:${rejected ? 0 : o.score};--c:${scoreColor(o.score)}`, title: "Fit score" }, el("span", {}, rejected ? "—" : o.score));
+    const card = el("article", { class: "card opp" + (o.shortlisted ? "" : " muted") },
+      el("div", { class: "opp-head" }, ring,
+        el("div", { style: "min-width:0" },
           el("h3", {}, el("a", { href: o.url }, opp.name)),
-          el("div", { class: "meta" }, [opp.type, opp.organizer, opp.funding_or_prize,
-            opp.deadline ? `deadline ${opp.deadline}${days !== null ? ` (${days}d)` : ""}` : "no deadline stated",
-            fit ? fit.verdict : null].filter(Boolean).join(" · ")),
-        ),
-      ),
-      el("p", {}, opp.summary),
-    );
-    if (rejected) card.append(el("div", { class: "label" }, "Filtered out"), list(o.rejected));
-    if (fit) {
-      if (fit.reasons.length) card.append(el("div", { class: "label" }, "Why"), list(fit.reasons));
-      if (fit.eligibility_blockers.length) card.append(el("div", { class: "label" }, "Eligibility blockers"), list(fit.eligibility_blockers));
-      if (fit.risks.length) card.append(el("div", { class: "label" }, "Risks / unclear"), list(fit.risks));
-    }
-    if (draft) {
-      const d = el("details", {}, el("summary", {}, `Draft application (${draft.answers.length} answers)`));
-      for (const a of draft.answers) {
-        d.append(el("div", { class: "answer" }, el("b", {}, a.question), a.answer,
-          el("div", { style: "margin-top:6px" }, el("button", { class: "btn secondary", onclick: (e) => {
-            navigator.clipboard?.writeText(a.answer); e.target.textContent = "Copied"; } }, "Copy"))));
-      }
-      if (draft.missing_info.length) d.append(el("div", { class: "label" }, "Gather before submitting"), list(draft.missing_info));
-      card.append(d);
-    }
+          el("div", { class: "meta" }, [opp.organizer, opp.funding_or_prize].filter(Boolean).join(" · ")),
+          el("div", { class: "chips" },
+            el("span", { class: "badge brand" }, opp.type),
+            deadlineBadge(opp.deadline),
+            fit ? el("span", { class: "badge " + (VERDICT[fit.verdict] || "") }, fit.verdict) : el("span", { class: "badge bad" }, "filtered out"),
+            opp.equity_taken ? el("span", { class: "badge" }, `Equity: ${opp.equity_taken}`) : null)),
+        el("div", { class: "opp-actions" },
+          o.draft ? el("button", { class: "btn sm", onclick: () => openDraft(o) }, "View draft") : null,
+          fit ? statusSelect(o) : null)),
+      el("p", { class: "summary" }, opp.summary));
+    const cols = el("div", { class: "cols" });
+    if (rejected) cols.append(el("div", {}, el("h4", {}, "Why it was filtered out"), list(o.rejected)));
+    if (fit?.reasons.length) cols.append(el("div", {}, el("h4", {}, "Why it fits"), list(fit.reasons)));
+    if (fit?.eligibility_blockers.length) cols.append(el("div", {}, el("h4", {}, "Eligibility blockers"), list(fit.eligibility_blockers)));
+    if (fit?.risks.length) cols.append(el("div", {}, el("h4", {}, "Check before applying"), list(fit.risks)));
+    if (cols.children.length) card.append(cols);
     return card;
   }
 
-  // Intel
+  // ---------------------------------------------------------------- draft dialog
+  function withPlaceholders(text) {
+    const parts = text.split(/(\[\[NEEDS:[^\]]*\]\])/g);
+    return parts.map((p) => /^\[\[NEEDS:/.test(p) ? el("mark", { class: "need" }, p) : p);
+  }
+  function openDraft(o) {
+    const draft = o.draft;
+    $("draftTitle").textContent = `Draft — ${o.name}`;
+    const body = $("draftBody"); body.replaceChildren();
+    if (draft.missing_info?.length) body.append(el("div", { class: "alert info", style: "margin:0 0 14px" },
+      el("b", {}, "Gather before submitting: "), draft.missing_info.join(" · ")));
+    for (const a of draft.answers) {
+      body.append(el("div", { class: "answer" },
+        el("div", { class: "answer-q" }, el("span", {}, a.question),
+          el("button", { class: "btn sm", onclick: async (e) => { await navigator.clipboard?.writeText(a.answer); e.target.textContent = "Copied"; } }, "Copy")),
+        el("div", { class: "answer-a" }, withPlaceholders(a.answer))));
+    }
+    body.append(el("p", { class: "help" }, "Drafts use only facts from your profile. Review every answer before you submit."));
+    $("copyAll").onclick = async () => {
+      await navigator.clipboard?.writeText(draft.answers.map((a) => `${a.question}\n\n${a.answer}`).join("\n\n---\n\n"));
+      toast("All answers copied");
+    };
+    $("draftDialog").showModal();
+  }
+  $("closeDraft").addEventListener("click", () => $("draftDialog").close());
+  $("draftDialog").addEventListener("click", (e) => { if (e.target === $("draftDialog")) $("draftDialog").close(); });
+
+  // ---------------------------------------------------------------- competitors
+  $("competitors").value = ls.get("competitors",
+    "name: RivalAI\nnews: RivalAI\npricing = https://rival.example.com/pricing\nchangelog = https://rival.example.com/changelog");
+  $("intelOffline").addEventListener("change", () => { $("fixtureRow").hidden = !$("intelOffline").checked; });
   function parseCompetitors(text) {
     return text.split(/\n\s*\n/).map((block) => {
       const c = { name: "", news_query: null, pages: {} };
@@ -348,53 +719,65 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
       return c;
     }).filter((c) => c.name);
   }
+  $("intelResults").replaceChildren(el("div", { class: "card empty" }, el("h3", {}, "Know when competitors move"),
+    el("p", { class: "sub" }, "The first check saves a baseline of each page. Later checks report pricing changes, launches, funding and hiring — each with the exact quote it came from."),
+    el("button", { class: "btn primary", style: "margin-top:14px", onclick: () => { $("intelOffline").checked = true; $("fixtureRow").hidden = false; $("runIntel").click(); } }, "Try the demo")));
   $("runIntel").addEventListener("click", async () => {
-    store.set("competitors", $("competitors").value);
+    ls.set("competitors", $("competitors").value);
     const competitors = parseCompetitors($("competitors").value);
-    if (!competitors.length) { $("intelStatus").className = "status err"; $("intelStatus").textContent = "Add at least one competitor with a name."; return; }
-    const result = await runJob("/api/intel/run", {
-      competitors, profile: store.get("profile", DEFAULT_PROFILE),
-      offline: $("intelOffline").checked, fixture_set: $("fixtureSet").value,
-    }, $("intelStatus"), $("runIntel"));
-    if (result) renderIntel(result);
+    if (!competitors.length) { alertBox("intelAlert", "err", "Add at least one competitor with a name."); return; }
+    const result = await runJob("/api/intel/run", { competitors, profile: profile(), offline: $("intelOffline").checked, fixture_set: $("fixtureSet").value }, "intel", $("runIntel"));
+    if (!result) return;
+    if ($("intelOffline").checked && $("fixtureSet").value === "week1") { $("fixtureSet").value = "week2"; alertBox("intelAlert", "info", "Baseline saved. Run again (Week 2 is now selected) to see detected changes."); }
+    renderIntel(result);
   });
-
   function renderIntel(r) {
     const box = $("intelResults"); box.replaceChildren();
-    box.append(el("div", { class: "summary" },
-      el("button", { class: "btn secondary", onclick: () => download("competitor-briefing.md", r.markdown) }, "Download Markdown")));
+    const head = el("div", { class: "card card-pad", style: "margin-bottom:14px" });
     if (r.digest) {
-      box.append(el("div", { class: "card" },
-        el("div", { class: "headline" }, r.digest.headline),
-        el("div", { class: "label" }, "What it means for us"), list(r.digest.implications),
-        el("div", { class: "label" }, "Suggested actions"), list(r.digest.recommended_actions)));
+      head.append(el("div", { class: "badge brand", style: "margin-bottom:8px" }, "This week's briefing"), el("div", { class: "headline" }, r.digest.headline),
+        el("div", { class: "cols" },
+          el("div", {}, el("h4", {}, "What it means for us"), list(r.digest.implications)),
+          el("div", {}, el("h4", {}, "Suggested actions"), list(r.digest.recommended_actions))));
     } else {
-      box.append(el("div", { class: "card" }, "No meaningful changes detected. On a first run this saves a baseline — run again later (or pick Demo week 2) to see changes."));
+      head.append(el("div", { class: "headline" }, "No meaningful changes detected"),
+        el("p", { class: "sub" }, "On a first run this saves a baseline. Check again later to see what changed."));
     }
+    head.append(el("div", { style: "margin-top:12px" }, el("button", { class: "btn sm", onclick: () => download("competitor-briefing.md", r.markdown) }, "Export briefing")));
+    box.append(head);
     for (const c of r.competitors) {
-      const card = el("div", { class: "card" }, el("h3", {}, c.name),
-        el("div", { class: "meta" }, c.pages.map((p) => `${p.label}: ${p.status}`).join(" · ") + ` · ${c.news.length} news`));
+      const card = el("div", { class: "card card-pad", style: "margin-bottom:12px" },
+        el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, el("h2", { style: "margin:0" }, c.name),
+          c.pages.map((p) => el("span", { class: "badge " + ({ changed: "warn", unchanged: "", baseline: "info", error: "bad" }[p.status] || "") }, `${p.label}: ${p.status}`)),
+          el("span", { class: "badge" }, `${c.news.length} news`)));
       for (const f of c.findings) {
-        card.append(el("div", { style: "margin-top:10px" },
-          el("span", { class: "pill " + f.importance }, f.importance), " ",
-          el("span", { class: "pill" }, f.category), " ", f.summary,
-          el("div", { class: "quote" }, `"${f.evidence_quote}" `, el("a", { href: f.source_url }, "source"))));
+        card.append(el("div", { class: "finding" },
+          el("div", { class: "chips", style: "margin-top:0" }, el("span", { class: "badge " + { high: "bad", medium: "warn", low: "" }[f.importance] }, f.importance), el("span", { class: "badge brand" }, f.category)),
+          el("div", { style: "margin-top:6px;font-weight:600" }, f.summary),
+          el("div", { class: "quote" }, `“${f.evidence_quote}” `, el("a", { href: f.source_url }, "source"))));
       }
-      if (c.ungrounded_dropped) card.append(el("div", { class: "hint" }, `${c.ungrounded_dropped} unverifiable finding(s) discarded by the grounding check.`));
-      if (c.error) card.append(el("div", { class: "status err" }, c.error));
+      if (!c.findings.length) card.append(el("p", { class: "sub", style: "margin-top:8px" }, "No meaningful changes."));
+      if (c.ungrounded_dropped) card.append(el("p", { class: "help" }, `${c.ungrounded_dropped} claim(s) discarded because the quote wasn't found in the source.`));
+      if (c.error) card.append(el("div", { class: "alert err" }, c.error));
       box.append(card);
     }
   }
 
-  // Server capabilities
+  // ---------------------------------------------------------------- server status
   api("/api/health").then((h) => {
-    $("tokenPanel").hidden = !h.token_required;
-    if (!h.firecrawl && !h.exa) {
-      $("oppOffline").checked = true; $("intelOffline").checked = true; $("fixtureRow").hidden = false;
-      for (const id of ["oppStatus", "intelStatus"]) $(id).textContent = "Live web search isn't configured on this server — offline demo mode is on.";
-    }
-    if (!h.anthropic) for (const id of ["oppStatus", "intelStatus"]) { $(id).className = "status err"; $(id).textContent = "The server has no Anthropic API key configured."; }
-  }).catch(() => {});
+    $("tokenWrap").hidden = !h.token_required;
+    const model = h.llm_provider === "gemini" ? "Google Gemini" : "Anthropic Claude";
+    $("statusModel").replaceChildren(el("span", { class: "dot " + (h.llm_ready ? "ok" : "bad") }), h.llm_ready ? `AI: ${model}` : `AI: no ${model} key`);
+    const live = h.firecrawl || h.exa;
+    $("statusSearch").replaceChildren(el("span", { class: "dot " + (live ? "ok" : "warn") }),
+      live ? `Web search: ${[h.firecrawl && "Firecrawl", h.exa && "Exa"].filter(Boolean).join(" + ")}` : "Web search: demo only");
+    if (!live) { $("oppOffline").checked = true; $("intelOffline").checked = true; $("fixtureRow").hidden = false; }
+    if (!h.llm_ready) for (const id of ["oppAlert", "intelAlert"]) alertBox(id, "err", `The server has no ${model} API key configured yet.`);
+  }).catch(() => $("statusModel").replaceChildren(el("span", { class: "dot bad" }), "Server unreachable"));
+
+  refreshLinks();
+  go(ls.get("page", "discover"));
+  if (ls.get("page", "discover") !== "pipeline") loadPipeline();
 })();
 </script>
 </body>

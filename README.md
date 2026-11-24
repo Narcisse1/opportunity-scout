@@ -3,37 +3,57 @@
 **Live demo:** https://opportunity-scout-98lk.onrender.com (free tier: the first load after
 idle can take about a minute to wake up)
 
-An autonomous research analyst built on **Claude** that does two jobs a startup founder
-usually does by hand:
+## The problem
 
-1. **Grant, accelerator & hackathon tracker**: searches the web (Firecrawl / Exa), extracts
-   opportunities from each page, filters out expired or excluded ones, scores fit against your
-   startup profile, and drafts tailored application answers for the shortlist.
-2. **Competitor & market intelligence**: snapshots competitor pricing and changelog pages,
-   detects what changed since last run, pulls recent news, and writes a sourced briefing.
+Early-stage founders, especially outside the big startup hubs, lose days every month
+hunting for funding: grants, accelerators, hackathons and credit programs are scattered across
+hundreds of sites, most turn out to be ineligible (wrong country, wrong stage, already closed),
+and each application asks the same questions in a slightly different way. Deadlines live in
+browser tabs and get missed.
 
-Use it from the **web UI**, the **CLI**, or on a **schedule** (GitHub Actions). Reports land
-in **Obsidian** (Markdown with YAML frontmatter) and optionally **Notion**.
+## What Opportunity Scout does
 
-## Web UI
+An AI research analyst (Google Gemini or Anthropic Claude) that turns this into a 5-minute
+weekly routine:
+
+1. **Finds** programs on the live web (Firecrawl + Exa) and reads each page.
+2. **Rules out** what you can't win: expired deadlines and excluded topics are dropped in
+   code; location, stage and sector requirements are checked against your profile and
+   explained as *eligibility blockers*.
+3. **Ranks** what's left with a 0–100 fit score and the reasons behind it.
+4. **Drafts** the application answers using only facts from your profile. Missing facts become
+   `[[NEEDS: …]]` placeholders, never invented numbers.
+5. **Tracks** your applications on a pipeline board (Saved → Applying → Submitted → Won/Lost)
+   with notes, and exports every deadline to Google/Outlook/Apple Calendar with a 7-day
+   reminder, or to CSV.
+6. **Watches competitors**: diffs their pricing/changelog pages, reads the news, and writes a
+   weekly briefing in which every claim quotes its source.
+
+Use it from the **web app**, the **CLI**, or on a **schedule** (GitHub Actions). Reports
+also export to **Obsidian** and **Notion**.
+
+## Web app
 
 ```bash
 uv run scout web          # http://127.0.0.1:8000
 ```
 
-- **Startup profile** tab: your facts (saved in the browser). Drafts use only these.
-- **Opportunities** tab: enter search queries, run a scan, get scored cards with reasons,
-  eligibility blockers, deadlines, and copy-ready draft answers.
-- **Competitor intel** tab: list competitors and their pricing/changelog URLs; get a
-  briefing with verified, quoted evidence.
-- **Offline demo** checkbox: runs on bundled sample pages (no scraping keys needed).
+| Page | What you do there |
+|---|---|
+| **Discover** | Run a scan; filter and sort scored results; open draft answers; add to pipeline |
+| **Pipeline** | Move applications between stages, keep notes, see the next deadline, export `.ics` / CSV |
+| **Competitors** | Track competitor pages and news; read the sourced weekly briefing |
+| **Startup profile** | The facts used for eligibility and drafting, with a completeness meter |
 
-Scans run as background jobs (`POST /api/opportunities/scan`, `POST /api/intel/run`, poll
-`GET /api/jobs/{id}`). Scraped text is always rendered as text, never as HTML. When hosting it
-publicly, set `SCOUT_ACCESS_TOKEN` so only people with the token can spend your API credits.
+**Demo mode** runs on bundled sample pages, so it works without web-search keys. Scans run as
+background jobs (`POST /api/opportunities/scan`, `POST /api/intel/run`, then poll
+`GET /api/jobs/{id}`); the pipeline lives at `/api/pipeline`, `/api/pipeline.ics` and
+`/api/pipeline.csv`. Scraped text is always rendered as text, never as HTML.
 
-**Deploy:** the included `Dockerfile` runs the UI on `$PORT`. It works on Render, Railway, or
-Fly.io: set `ANTHROPIC_API_KEY`, `FIRECRAWL_API_KEY` and/or `EXA_API_KEY`, and `SCOUT_ACCESS_TOKEN`.
+**Deploy:** the `Dockerfile` serves the app on `$PORT` (Render, Railway, Fly.io). Set an LLM
+key (`GEMINI_API_KEY` or `ANTHROPIC_API_KEY`), `FIRECRAWL_API_KEY` and/or `EXA_API_KEY`, and
+`SCOUT_ACCESS_TOKEN`. The deployment is a single shared workspace (one team's pipeline),
+protected by that token so only people you give it to can use your API credits.
 
 ```mermaid
 flowchart LR
@@ -67,8 +87,17 @@ flowchart LR
 | Classify competitor changes | Claude, structured output | `CompetitorAnalysis` |
 | Write the briefing | Claude, structured output | `IntelDigest` |
 
-All calls go through `scout/llm.py` using `client.messages.parse()` with Pydantic schemas,
-so no step parses free text.
+All calls go through `scout/llm.py`, which returns validated Pydantic objects, so no step
+parses free text. Two providers sit behind the same interface:
+
+| `LLM_PROVIDER` | Key | Default model | How structured output works |
+|---|---|---|---|
+| `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-5-5` | `messages.parse()` + refusal fallbacks on supported models |
+| `gemini` | `GEMINI_API_KEY` | `gemini-flash-latest` | `response_schema` JSON mode, with retry/backoff for free-tier rate limits |
+
+Override the model with `SCOUT_MODEL` (e.g. `claude-haiku-5-5` for low-cost runs). Cost
+estimates use each model's own prices. Refusals and safety blocks raise the same typed errors
+for both providers, so the pipelines don't depend on which one is active.
 
 ## Design decisions
 
@@ -95,7 +124,7 @@ so no step parses free text.
 
 ```bash
 uv venv && uv pip install -e ".[dev]"
-cp .env.example .env                 # add ANTHROPIC_API_KEY, FIRECRAWL_API_KEY and/or EXA_API_KEY
+cp .env.example .env                 # add ANTHROPIC_API_KEY or GEMINI_API_KEY, plus FIRECRAWL/EXA keys
 cp scout.example.yaml scout.yaml     # queries, competitors, output folder
 cp profile.example.yaml profile.yaml # your startup's real facts
 
@@ -148,7 +177,8 @@ scout/
   publish.py        Obsidian Markdown + Notion
   prompts.py        system prompts
   cli.py            `scout` command
-  web.py            FastAPI app: background jobs + JSON API
+  web.py            FastAPI app: background jobs, pipeline API, exports
+  exports.py        iCalendar (RFC 5545) and CSV exports of the pipeline
   static/index.html single-page UI (no build step)
 tests/              offline tests (fake LLM, mocked HTTP)
 evals/              labeled cases + eval runner

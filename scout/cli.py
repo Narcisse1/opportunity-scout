@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 from .config import AppConfig, env, load_config, load_profile
 from .http import SourceError
 from .intel import IntelMonitor
-from .llm import ClaudeLLM
+from .llm import make_llm
 from .opportunities import OpportunityScout
 from .publish import NotionPublisher, intel_markdown, opportunities_markdown, write_obsidian
 from .sources import ExaSource, FirecrawlSource, FixtureSource, MultiSource
@@ -66,7 +66,7 @@ def cmd_opportunities(args: argparse.Namespace) -> int:
     profile = load_profile(args.profile)
     search, fetcher = build_search_and_fetcher(args.offline)
     store = Store(":memory:" if args.offline else cfg.database)
-    llm = ClaudeLLM(cfg.model)
+    llm = make_llm(model=cfg.model)
     scout = OpportunityScout(
         profile,
         search=search,
@@ -115,7 +115,7 @@ def cmd_intel(args: argparse.Namespace) -> int:
     monitor = IntelMonitor(
         cfg.intel.competitors,
         fetcher=fetcher,
-        llm=ClaudeLLM(cfg.model),
+        llm=make_llm(model=cfg.model),
         store=store,
         news=news,
         profile=profile,
