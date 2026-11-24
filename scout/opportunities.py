@@ -221,6 +221,7 @@ class OpportunityScout:
                 except (LLMError, SourceError) as exc:
                     # Not marked seen, so the page is retried on the next run.
                     report.errors.append(f"{doc.url}: {exc}")
+                    log.warning("page failed: %s: %s", doc.url, exc)
                     continue
                 self.store.mark_seen(doc.url, now)
                 report.documents_processed += 1
@@ -239,7 +240,13 @@ class OpportunityScout:
     # -- per page -------------------------------------------------------------
     def _process(self, doc: Document, today: date) -> list[ScoredOpportunity]:
         if len(doc.content) < self.min_content_chars:
-            doc = self.fetcher.fetch(doc.url)
+            try:
+                doc = self.fetcher.fetch(doc.url)
+            except SourceError:
+                # Some sites refuse every scraper; the search snippet may still be enough.
+                if len(doc.content.strip()) < 200:
+                    raise
+                log.info("scrape failed for %s; using the search result text", doc.url)
 
         extraction = self.llm.structured(
             system=EXTRACT_SYSTEM,

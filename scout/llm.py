@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 from dataclasses import dataclass, field
 from typing import Any, Protocol, TypeVar
@@ -27,7 +28,7 @@ log = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_CLAUDE_MODEL = "claude-opus-5-5"
-DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
+DEFAULT_GEMINI_MODEL = "auto"  # newest stable Flash model the key can use (see pick_gemini_model)
 DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL  # backwards-compatible name
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
@@ -207,12 +208,45 @@ def _name(value: Any) -> str:
     return str(getattr(value, "name", value)).rsplit(".", 1)[-1].upper()
 
 
+_SPECIALISED = ("image", "tts", "audio", "live", "embedding", "vision", "learnlm", "robotics")
+_UNSTABLE = ("preview", "exp", "lite")
+
+
+def pick_gemini_model(models: Any) -> str | None:
+    """Choose the newest general-purpose Flash model that supports generateContent.
+
+    Google renames and retires Gemini model IDs often, so the app asks the API which models
+    this key can use instead of hard-coding one. Stable models win over preview/lite ones."""
+    stable, fallback = [], []
+    for m in models:
+        name = str(getattr(m, "name", "") or "").removeprefix("models/")
+        actions = getattr(m, "supported_actions", None) or getattr(
+            m, "supported_generation_methods", None
+        )
+        if actions and "generateContent" not in actions:
+            continue
+        if not name.startswith("gemini") or "flash" not in name:
+            continue
+        if any(word in name for word in _SPECIALISED):
+            continue
+        version = tuple(int(n) for n in re.findall(r"\d+", name.split("flash")[0]))
+        # Prefer bare names ("gemini-3-flash") over dated variants with the same version.
+        rank = (version, -len(name))
+        (fallback if any(word in name for word in _UNSTABLE) else stable).append((rank, name))
+    pool = stable or fallback
+    return max(pool)[1] if pool else None
+
+
+_discovered: dict[int, str] = {}  # id(client) -> model, shared by the LLMs of one process
+_discover_lock = threading.Lock()
+
+
 class GeminiLLM:
     """Gemini via the google-genai SDK, using JSON-schema constrained output."""
 
     def __init__(
         self,
-        model: str = DEFAULT_GEMINI_MODEL,
+        model: str | None = DEFAULT_GEMINI_MODEL,
         *,
         client: Any | None = None,
         api_key: str | None = None,
@@ -220,15 +254,30 @@ class GeminiLLM:
         attempts: int = 6,
     ) -> None:
         if client is None:
-            from google import genai
-
-            key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            client = genai.Client(api_key=key)
+            client = _gemini_client(api_key)
         self.client = client
-        self.model = model
+        self.model = None if model in (None, "", "auto") else model
         self.max_output_tokens = max_output_tokens
         self.attempts = attempts
-        self.usage = UsageMeter(model=model)
+        self.usage = UsageMeter(model=self.model or "gemini")
+
+    def _discover_model(self, *, refresh: bool = False) -> str:
+        with _discover_lock:
+            key = id(self.client)
+            if refresh or key not in _discovered:
+                try:
+                    chosen = pick_gemini_model(self.client.models.list())
+                except Exception as exc:
+                    raise LLMError(f"could not list Gemini models for this key: {exc}") from exc
+                if not chosen:
+                    raise LLMError("no Gemini Flash model with generateContent is available")
+                log.warning("using Gemini model %s", chosen)
+                _discovered[key] = chosen
+            return _discovered[key]
+
+    def _set_model(self, model: str) -> None:
+        self.model = model
+        self.usage.model = model
 
     def _config(self, system: str, schema: type[BaseModel]) -> Any:
         from google.genai import types
@@ -243,6 +292,9 @@ class GeminiLLM:
 
     def _generate(self, system: str, prompt: str, schema: type[BaseModel]) -> Any:
         config = self._config(system, schema)
+        if self.model is None:
+            self._set_model(self._discover_model())
+        rediscovered = False
         for attempt in range(self.attempts):
             try:
                 return self.client.models.generate_content(
@@ -250,6 +302,16 @@ class GeminiLLM:
                 )
             except Exception as exc:  # SDK raises google.genai.errors.APIError subclasses
                 code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+                if code == 404 and not rediscovered:
+                    # The model was renamed or retired: switch to one this key can use.
+                    rediscovered = True
+                    replacement = self._discover_model(refresh=True)
+                    if replacement != self.model:
+                        log.warning(
+                            "Gemini model %s unavailable; using %s", self.model, replacement
+                        )
+                        self._set_model(replacement)
+                        continue
                 if code not in RETRYABLE_CODES or attempt == self.attempts - 1:
                     raise LLMError(f"gemini request failed: {exc}") from exc
                 # Free-tier rate limits are per minute, so back off generously.
@@ -298,6 +360,20 @@ class GeminiLLM:
 # ---------------------------------------------------------------------------
 # Provider selection
 # ---------------------------------------------------------------------------
+
+
+_clients: dict[str, Any] = {}
+
+
+def _gemini_client(api_key: str | None) -> Any:
+    """One SDK client per key, so model discovery happens once per process, not per job."""
+    from google import genai
+
+    key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
+    with _discover_lock:
+        if key not in _clients:
+            _clients[key] = genai.Client(api_key=key or None)
+        return _clients[key]
 
 
 def _env(name: str) -> str | None:

@@ -191,6 +191,25 @@ class MultiSource:
         return list(merged.values())
 
 
+class FallbackFetcher:
+    """Try each fetcher in order. Scrapers each refuse different sites (e.g. social networks),
+    so a second provider recovers many pages the first one rejects."""
+
+    def __init__(self, fetchers: list[Fetcher]) -> None:
+        if not fetchers:
+            raise ValueError("FallbackFetcher needs at least one fetcher")
+        self.fetchers = fetchers
+
+    def fetch(self, url: str) -> Document:
+        errors = []
+        for fetcher in self.fetchers:
+            try:
+                return fetcher.fetch(url)
+            except SourceError as exc:
+                errors.append(f"{getattr(fetcher, 'name', type(fetcher).__name__)}: {exc}")
+        raise SourceError("; ".join(errors))
+
+
 _WORD = re.compile(r"[a-z0-9]+")
 
 

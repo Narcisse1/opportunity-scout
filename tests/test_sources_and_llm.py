@@ -109,6 +109,51 @@ def test_multisource_merges_and_tolerates_partial_failure():
         MultiSource([_Fixed("s3", error="down")]).search("q")
 
 
+class _Fetch:
+    def __init__(self, name, doc=None):
+        self.name, self.doc, self.calls = name, doc, 0
+
+    def fetch(self, url):
+        self.calls += 1
+        if self.doc is None:
+            raise SourceError(f"{self.name} refused {url}")
+        return self.doc
+
+
+def test_fallback_fetcher_tries_next_provider():
+    from scout.sources import Document, FallbackFetcher
+
+    good = Document("https://fb.com/x", "X", "page text", "exa")
+    first, second = _Fetch("firecrawl"), _Fetch("exa", good)
+    assert FallbackFetcher([first, second]).fetch("https://fb.com/x") is good
+    with pytest.raises(SourceError, match="firecrawl refused.*exa refused"):
+        FallbackFetcher([_Fetch("firecrawl"), _Fetch("exa")]).fetch("https://fb.com/x")
+
+
+def test_scout_uses_search_text_when_every_scraper_refuses(profile):
+    from datetime import date
+
+    from conftest import FakeLLM
+
+    from scout.models import ExtractionResult
+    from scout.opportunities import OpportunityScout
+    from scout.sources import Document
+
+    snippet = Document("https://fb.com/post", "Grant", "Grant details. " * 30, "exa")
+    llm = FakeLLM({ExtractionResult: lambda s, p: ExtractionResult(opportunities=[])})
+    scout = OpportunityScout(
+        profile,
+        search=_Fixed("s", [snippet]),
+        fetcher=_Fetch("firecrawl"),
+        llm=llm,
+        store=Store(),
+        min_content_chars=5000,
+    )
+    report = scout.run(["grant"], today=date(2026, 11, 24))
+    assert report.errors == [] and report.documents_processed == 1
+    assert "Grant details." in llm.calls[0][2]
+
+
 # --- Claude wrapper ---------------------------------------------------------------
 
 

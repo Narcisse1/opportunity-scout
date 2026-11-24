@@ -22,7 +22,7 @@ from .intel import IntelMonitor
 from .llm import make_llm
 from .opportunities import OpportunityScout
 from .publish import NotionPublisher, intel_markdown, opportunities_markdown, write_obsidian
-from .sources import ExaSource, FirecrawlSource, FixtureSource, MultiSource
+from .sources import ExaSource, FallbackFetcher, FirecrawlSource, FixtureSource, MultiSource
 from .store import Store
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
@@ -43,8 +43,8 @@ def build_search_and_fetcher(offline: bool, fixture_dir: Path | None = None):
         sources.append(exa)
     if not sources:
         sys.exit("Set FIRECRAWL_API_KEY and/or EXA_API_KEY (or run with --offline).")
-    fetcher = firecrawl or exa  # Firecrawl gives cleaner page markdown when both exist
-    return MultiSource(sources), fetcher
+    # Firecrawl gives cleaner markdown; Exa recovers pages Firecrawl refuses.
+    return MultiSource(sources), FallbackFetcher([s for s in (firecrawl, exa) if s])
 
 
 def publish(cfg: AppConfig, folder: str, filename: str, title: str, markdown: str) -> None:

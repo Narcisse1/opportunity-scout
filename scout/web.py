@@ -30,7 +30,7 @@ from .llm import StructuredLLM, make_llm, provider_ready, resolve_provider
 from .models import Competitor, StartupProfile
 from .opportunities import OpportunityScout, ScanReport
 from .publish import intel_markdown, opportunities_markdown
-from .sources import ExaSource, FirecrawlSource, FixtureSource, MultiSource
+from .sources import ExaSource, FallbackFetcher, FirecrawlSource, FixtureSource, MultiSource
 from .store import Store
 
 TRACKED = ["saved", "applying", "submitted", "won", "lost"]
@@ -143,7 +143,7 @@ def create_app(
                 "Live mode needs FIRECRAWL_API_KEY or EXA_API_KEY on the "
                 "server. Use the offline demo instead.",
             )
-        return MultiSource(sources), sources[0]
+        return MultiSource(sources), FallbackFetcher(sources)
 
     get_live = live_sources or default_live_sources
 
