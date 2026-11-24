@@ -154,7 +154,7 @@ def test_scout_uses_search_text_when_every_scraper_refuses(profile):
     from scout.opportunities import OpportunityScout
     from scout.sources import Document
 
-    snippet = Document("https://fb.com/post", "Grant", "Grant details. " * 30, "exa")
+    snippet = Document("https://grants.example.org/post", "Grant", "Grant details. " * 30, "exa")
     llm = FakeLLM({ExtractionResult: lambda s, p: ExtractionResult(opportunities=[])})
     scout = OpportunityScout(
         profile,

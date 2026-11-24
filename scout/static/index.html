@@ -582,7 +582,10 @@ mark.need { background: var(--warn-weak); color: var(--warn); padding: 0 3px; bo
     try { await api(`/api/pipeline/${encodeURIComponent(r.key)}`, { method: "PUT", body: { status: r.status, notes: text } }); r.notes = text; }
     catch (e) { toast(e.message, true); }
   }
-  function stat(k, v, title) { return el("div", { class: "card stat", title: title || null }, el("div", { class: "k" }, k), el("div", { class: "v" }, v)); }
+  function stat(k, v, title, note) {
+    return el("div", { class: "card stat", title: title || null }, el("div", { class: "k" }, k), el("div", { class: "v" }, v),
+      note ? el("div", { class: "help", style: "margin-top:2px" }, note) : null);
+  }
 
   // ---------------------------------------------------------------- discover
   $("queries").value = ls.get("queries", [
@@ -632,9 +635,13 @@ mark.need { background: var(--warn-weak); color: var(--warn); padding: 0 3px; bo
     const short = r.opportunities.filter((o) => o.shortlisted);
     const closing = short.filter((o) => { const d = daysLeft(o.deadline); return d !== null && d >= 0 && d <= 30; });
     $("oppStats").hidden = false; $("oppToolbar").hidden = false;
-    $("oppStats").replaceChildren(stat("Pages read", r.documents_processed), stat("Opportunities", r.opportunities.length),
+    const seen = r.documents_already_seen || 0, walled = r.documents_unreadable || 0;
+    const pageNote = [`${r.documents_found} found`, seen && `${seen} reviewed before`, walled && `${walled} login-only skipped`]
+      .filter(Boolean).join(" · ");
+    $("oppStats").replaceChildren(stat("New pages read", r.documents_processed, null, pageNote),
+      stat("Opportunities", r.opportunities.length, null, r.opportunities.length - short.length ? `${r.opportunities.length - short.length} filtered out` : null),
       stat("Shortlisted", short.length), stat("Closing ≤ 30 days", closing.length),
-      stat("Run cost", `$${(r.usage?.estimated_cost_usd ?? 0).toFixed(2)}`));
+      stat("Run cost", `$${(r.usage?.estimated_cost_usd ?? 0).toFixed(2)}`, null, `${r.usage?.calls ?? 0} AI calls`));
     const q = $("oppFilter").value.toLowerCase(), type = $("oppType").value;
     let items = r.opportunities.filter((o) => $("showAll").checked || o.shortlisted)
       .filter((o) => !type || o.type === type)
@@ -644,8 +651,14 @@ mark.need { background: var(--warn-weak); color: var(--warn); padding: 0 3px; bo
       : (a, b) => b.score - a.score);
     const box = $("oppResults"); box.replaceChildren();
     if (!items.length) {
-      box.append(el("div", { class: "card empty" }, el("h3", {}, r.opportunities.length ? "Nothing matches these filters" : "No new opportunities found"),
-        el("p", { class: "sub" }, r.opportunities.length ? "Turn on “Show filtered out” to see programs that didn't make the shortlist." : "Pages you've already scanned are skipped. Try new or broader searches.")));
+      const hidden = r.opportunities.length && !$("showAll").checked;
+      box.append(el("div", { class: "card empty" },
+        el("h3", {}, hidden ? "Nothing made the shortlist" : r.opportunities.length ? "Nothing matches these filters" : "No new opportunities found"),
+        el("p", { class: "sub" }, hidden
+          ? `${r.opportunities.length} program(s) were found but scored below your threshold or were ruled out (e.g. closed deadline). See why below.`
+          : seen ? `${seen} result(s) were already reviewed in earlier scans and skipped. Try new or broader searches.`
+          : "Try new or broader searches."),
+        hidden ? el("button", { class: "btn primary", style: "margin-top:14px", onclick: () => { $("showAll").checked = true; renderOpps(); } }, "Show filtered-out programs") : null));
     }
     items.forEach((o) => box.append(oppCard(o)));
     if (r.errors.length) box.append(el("details", { class: "card card-pad" }, el("summary", {}, `${r.errors.length} page(s) couldn't be processed`), list(r.errors)));

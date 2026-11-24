@@ -20,6 +20,7 @@ from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
+from urllib.parse import urlparse
 
 from .http import SourceError
 from .llm import LLMError, LLMQuotaExceeded, StructuredLLM
@@ -135,6 +136,8 @@ class ScanReport:
     started: str
     queries: list[str]
     documents_found: int = 0
+    documents_already_seen: int = 0  # reviewed in an earlier scan, so not re-analysed
+    documents_unreadable: int = 0  # login-walled sites (social networks) skipped up front
     documents_processed: int = 0
     opportunities: list[ScoredOpportunity] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
@@ -149,6 +152,19 @@ class ScanReport:
 # ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
+
+
+# Sites that show their content only to logged-in users: no scraper can read them, so
+# analysing them wastes AI calls and fills the report with errors.
+LOGIN_WALLED = (
+    "facebook.com", "fb.com", "instagram.com", "linkedin.com", "x.com", "twitter.com",
+    "tiktok.com", "threads.net",
+)  # fmt: skip
+
+
+def is_login_walled(url: str) -> bool:
+    host = urlparse(url).hostname or ""
+    return any(host == d or host.endswith("." + d) for d in LOGIN_WALLED)
 
 
 def render_document(doc: Document) -> str:
@@ -209,7 +225,10 @@ class OpportunityScout:
                 report.errors.append(f"search '{query}': {exc}")
         report.documents_found = len(docs)
 
-        new_docs = [d for d in docs.values() if not self.store.is_seen(d.url)]
+        readable = [d for d in docs.values() if not is_login_walled(d.url)]
+        report.documents_unreadable = len(docs) - len(readable)
+        new_docs = [d for d in readable if not self.store.is_seen(d.url)]
+        report.documents_already_seen = len(readable) - len(new_docs)
         log.info("%d results, %d new pages to analyse", len(docs), len(new_docs))
 
         results: dict[str, ScoredOpportunity] = {}

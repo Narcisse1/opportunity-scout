@@ -80,6 +80,17 @@ def test_clamp_score():
     assert clamp_score(inel).score == 20
 
 
+def test_login_walled_sites():
+    from scout.opportunities import is_login_walled
+
+    assert is_login_walled("https://www.facebook.com/opportunitiesforafricans/posts/1")
+    assert is_login_walled("https://www.linkedin.com/posts/x") and is_login_walled(
+        "https://x.com/a"
+    )
+    assert not is_login_walled("https://opportunitiesforafricans.com/grant")
+    assert not is_login_walled("https://example.org/box.com")
+
+
 # --- pipeline -------------------------------------------------------------------
 
 
@@ -187,6 +198,22 @@ def test_second_run_is_incremental(profile):
     report = make_scout(profile, llm2, store).run(["grant hackathon"], 10, today=TODAY)
     assert llm2.calls == []  # every page already processed: zero tokens spent
     assert report.documents_processed == 0
+    assert report.documents_already_seen == report.documents_found > 0
+
+
+def test_social_pages_are_skipped_without_ai_calls(profile):
+    from scout.sources import Document
+
+    class Search:
+        name = "s"
+
+        def search(self, query, limit=5, since_days=None):
+            return [Document("https://www.facebook.com/groups/grants/1", "Grants", "x" * 800, "s")]
+
+    llm = make_llm()
+    scout = OpportunityScout(profile, search=Search(), fetcher=Search(), llm=llm, store=Store())
+    report = scout.run(["grant"], today=TODAY)
+    assert report.documents_unreadable == 1 and report.errors == [] and llm.calls == []
 
 
 def test_failed_page_is_reported_and_retried_next_run(profile):
