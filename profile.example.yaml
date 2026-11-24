@@ -1,25 +1,18 @@
-# Copy to profile.yaml and replace with your real startup's facts.
-# Drafted applications use ONLY what is written here, so be specific and truthful.
-name: Example Startup
-one_liner: AI assistant that helps smallholder farmers diagnose crop disease from a phone photo.
+# Copy to profile.yaml and fill in your company's facts.
+# Eligibility checks and drafted applications use ONLY what is written here: be specific and truthful.
+# Missing facts appear as [[NEEDS: ...]] placeholders in drafts instead of being invented.
+name: ""                 # company name
+one_liner: ""            # what you do, for whom
 description: >
-  Farmers send a photo over WhatsApp; a vision model identifies likely diseases and an LLM
-  replies with treatment advice in the farmer's language.
-stage: pre-seed
-sectors: [agritech, AI]
-country: Cameroon
-regions_served: [Central Africa, West Africa]
-founded_year: 2025
-team:
-  - "Founder/CTO: software engineer, builds the AI pipeline"
-funding_raised: "$0 (bootstrapped)"
-traction:
-  - "Pilot with 40 farmers"
-goals:
-  - non-dilutive funding to extend the pilot
-  - cloud / AI API credits
-  - mentorship and partner introductions
-exclude_keywords:
-  - crypto
-  - token sale
-writing_samples: []
+  Problem, solution and how the product works.
+stage: pre-seed          # idea | pre-seed | seed | series A | series B+
+sectors: []              # e.g. [agritech, AI]
+country: ""              # country of incorporation / headquarters
+regions_served: []
+founded_year: null
+team: []                 # one entry per person: role and relevant experience
+funding_raised: ""
+traction: []             # users, pilots, revenue, partnerships
+goals: []                # e.g. non-dilutive funding, cloud credits, mentorship
+exclude_keywords: []     # never show programs that mention these
+writing_samples: []      # optional: past application answers, to match your voice
