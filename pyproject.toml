@@ -42,3 +42,4 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
 "scout/static/*" = ["ALL"]
+"scout/emails.py" = ["E501"]  # inline-styled email HTML

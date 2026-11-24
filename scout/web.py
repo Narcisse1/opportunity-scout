@@ -3,8 +3,12 @@
     uv run scout web            # http://127.0.0.1:8000
 
 Scans take minutes, so they run as background jobs: the UI POSTs a job and polls it.
-Set SCOUT_ACCESS_TOKEN to require an `X-Access-Token` header when the app is public,
-since every live run spends the server's API credits.
+
+Access: anyone can use the app as a guest. Sample-page runs are unlimited; live web runs
+spend the server's API credits, so guests get a small daily allowance per visitor and in
+total (SCOUT_GUEST_RUNS_PER_VISITOR, SCOUT_GUEST_RUNS_PER_DAY) and smaller searches. The
+owner sends SCOUT_ACCESS_TOKEN as `X-Access-Token` to lift the limits and to run the weekly
+email digest. Set SCOUT_GUEST_ACCESS=off to require the token for everything.
 """
 
 from __future__ import annotations
@@ -19,11 +23,12 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from .config import env
+from .emails import upcoming_deadlines, weekly_email
 from .exports import to_csv, to_ics
 from .intel import IntelMonitor, IntelReport
 from .llm import StructuredLLM, make_llm, provider_ready, resolve_provider
@@ -43,6 +48,66 @@ MAX_QUERIES = 10
 MAX_COMPETITORS = 5
 MAX_JOBS_KEPT = 200
 
+# Guest limits for live (credit-spending) runs.
+GUEST_MAX_QUERIES = 3
+GUEST_MAX_RESULTS = 3
+GUEST_MAX_COMPETITORS = 2
+
+Access = Literal["owner", "guest"]
+
+
+class GuestQuota:
+    """Counts live runs per visitor and in total, per UTC day."""
+
+    def __init__(self, per_visitor: int, per_day: int) -> None:
+        self.per_visitor, self.per_day = per_visitor, per_day
+        self._day = ""
+        self._by_visitor: dict[str, int] = {}
+        self._total = 0
+        self._lock = threading.Lock()
+
+    def _roll(self) -> None:
+        today = datetime.now(timezone.utc).date().isoformat()
+        if today != self._day:
+            self._day, self._by_visitor, self._total = today, {}, 0
+
+    def remaining(self, visitor: str) -> int:
+        with self._lock:
+            self._roll()
+            return max(
+                0,
+                min(
+                    self.per_visitor - self._by_visitor.get(visitor, 0),
+                    self.per_day - self._total,
+                ),
+            )
+
+    def take(self, visitor: str) -> None:
+        with self._lock:
+            self._roll()
+            if self._total >= self.per_day:
+                raise HTTPException(
+                    429,
+                    "Today's live searches for guests are used up. Try 'Sample pages' mode, "
+                    "or come back tomorrow.",
+                )
+            if self._by_visitor.get(visitor, 0) >= self.per_visitor:
+                raise HTTPException(
+                    429,
+                    f"Guests can run {self.per_visitor} live searches a day. Try 'Sample "
+                    "pages' mode, which has no limit.",
+                )
+            self._by_visitor[visitor] = self._by_visitor.get(visitor, 0) + 1
+            self._total += 1
+
+
+def visitor_id(request: Request) -> str:
+    # Render and most hosts put the client address first in X-Forwarded-For.
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
 
 class ScanRequest(BaseModel):
     profile: StartupProfile
@@ -59,6 +124,21 @@ class IntelRequest(BaseModel):
     news_days: int = Field(7, ge=1, le=60)
     offline: bool = False
     fixture_set: Literal["week1", "week2"] = "week1"
+
+
+class WeeklyDigestRequest(BaseModel):
+    profile: StartupProfile
+    queries: list[str] = Field(min_length=1, max_length=MAX_QUERIES)
+    min_score: int = Field(60, ge=0, le=100)
+    results_per_query: int = Field(4, ge=1, le=10)
+    deadline_window_days: int = Field(45, ge=1, le=365)
+    app_url: str = ""
+
+
+class EmailPreviewRequest(BaseModel):
+    company: str = Field(min_length=1, max_length=200)
+    opportunities: list[dict[str, Any]] = Field(max_length=50)
+    min_score: int = Field(60, ge=0, le=100)
 
 
 class PipelineUpdate(BaseModel):
@@ -150,14 +230,32 @@ def create_app(
 
     get_live = live_sources or default_live_sources
 
-    def check_token(
+    quota = GuestQuota(
+        int(env("SCOUT_GUEST_RUNS_PER_VISITOR") or 3), int(env("SCOUT_GUEST_RUNS_PER_DAY") or 25)
+    )
+
+    def guests_allowed() -> bool:
+        return (env("SCOUT_GUEST_ACCESS") or "on").lower() not in ("off", "false", "0", "no")
+
+    def access(
         x_access_token: str | None = Header(default=None),
         token: str | None = Query(default=None),  # for download links, which can't set headers
-    ) -> None:
+    ) -> Access:
         expected = env("SCOUT_ACCESS_TOKEN")
         given = x_access_token or token or ""
-        if expected and not secrets.compare_digest(given, expected):
-            raise HTTPException(401, "Missing or wrong access token")
+        if not expected:
+            return "owner"  # private/local install: no token configured
+        if given:
+            if secrets.compare_digest(given, expected):
+                return "owner"
+            raise HTTPException(401, "Wrong access token")
+        if guests_allowed():
+            return "guest"
+        raise HTTPException(401, "Missing access token")
+
+    def owner_only(level: Access = Depends(access)) -> None:  # noqa: B008
+        if level != "owner":
+            raise HTTPException(401, "This action needs the owner's access token")
 
     def submit(kind: str, work: Callable[[], dict[str, Any]]) -> Job:
         job = Job(id=uuid.uuid4().hex[:12], kind=kind, created=time.time())
@@ -187,24 +285,35 @@ def create_app(
         return FileResponse(STATIC / "index.html")
 
     @app.get("/api/health")
-    def health() -> dict[str, Any]:
+    def health(request: Request) -> dict[str, Any]:
         provider = resolve_provider()
+        token_set = bool(env("SCOUT_ACCESS_TOKEN"))
         return {
             "llm_provider": provider,
             "llm_ready": provider_ready(provider) or llm_factory is not None,
             "firecrawl": bool(env("FIRECRAWL_API_KEY")),
             "exa": bool(env("EXA_API_KEY")),
-            "token_required": bool(env("SCOUT_ACCESS_TOKEN")),
+            "token_required": token_set and not guests_allowed(),
+            "guest_access": token_set and guests_allowed(),
+            "guest_live_runs_left": quota.remaining(visitor_id(request)) if token_set else None,
         }
 
-    @app.post("/api/opportunities/scan", dependencies=[Depends(check_token)])
-    def scan(req: ScanRequest) -> Job:
+    def charge_guest(level: Access, request: Request, offline: bool) -> None:
+        if level == "guest" and not offline:
+            quota.take(visitor_id(request))
+
+    @app.post("/api/opportunities/scan")
+    def scan(req: ScanRequest, request: Request, level: Access = Depends(access)) -> Job:  # noqa: B008
         if req.offline:
             source = FixtureSource(FIXTURES / "opportunities")
             search, fetcher, run_store = source, source, Store(":memory:")
         else:
             search, fetcher = get_live()
             run_store = shared_store
+            if level == "guest":
+                req.queries = req.queries[:GUEST_MAX_QUERIES]
+                req.results_per_query = min(req.results_per_query, GUEST_MAX_RESULTS)
+        charge_guest(level, request, req.offline)
 
         def work() -> dict[str, Any]:
             today = date.today()
@@ -222,8 +331,8 @@ def create_app(
 
         return submit("opportunities", work)
 
-    @app.post("/api/intel/run", dependencies=[Depends(check_token)])
-    def intel(req: IntelRequest) -> Job:
+    @app.post("/api/intel/run")
+    def intel(req: IntelRequest, request: Request, level: Access = Depends(access)) -> Job:  # noqa: B008
         if req.offline:
             fetcher = FixtureSource(FIXTURES / "intel" / req.fixture_set)
             news_dir = FIXTURES / "intel" / f"{req.fixture_set}-news"
@@ -232,6 +341,9 @@ def create_app(
         else:
             news, fetcher = get_live()
             run_store = shared_store
+            if level == "guest":
+                req.competitors = req.competitors[:GUEST_MAX_COMPETITORS]
+        charge_guest(level, request, req.offline)
 
         def work() -> dict[str, Any]:
             monitor = IntelMonitor(
@@ -254,12 +366,62 @@ def create_app(
             raise HTTPException(404, "Unknown job")
         return job
 
+    # --- weekly email digest ---------------------------------------------------
+    @app.post("/api/digest/weekly", dependencies=[Depends(owner_only)])
+    def weekly_digest(req: WeeklyDigestRequest) -> dict[str, Any]:
+        """Run a live scan and return a ready-to-send email (called weekly by n8n).
+
+        Pages reviewed in earlier weeks are skipped, so the email lists only new programs.
+        """
+        search, fetcher = get_live()
+        today = date.today()
+        scout = OpportunityScout(
+            req.profile,
+            search=search,
+            fetcher=fetcher,
+            llm=new_llm(),
+            store=shared_store,
+            min_score=req.min_score,
+            draft=False,
+        )
+        report = scout.run(req.queries, req.results_per_query, today=today)
+        new = [o.record() for o in report.shortlist(req.min_score)]
+        tracked = shared_store.list_opportunities(statuses=["saved", "applying"])
+        upcoming = upcoming_deadlines(tracked, today, req.deadline_window_days)
+        email = weekly_email(
+            req.profile.name, new, upcoming, today, app_url=req.app_url, notice=report.notice
+        )
+        return {
+            **email,
+            "new_count": len(new),
+            "upcoming_count": len(upcoming),
+            "documents_processed": report.documents_processed,
+            "errors": report.errors[:10],
+            "usage": report.usage,
+        }
+
+    @app.post("/api/digest/preview")
+    def preview_digest(req: EmailPreviewRequest) -> dict[str, str]:
+        """Render the weekly email from results already on screen (no scan, no AI calls)."""
+        today = date.today()
+        new = [
+            r
+            for r in req.opportunities
+            if isinstance(r.get("name"), str)
+            and r.get("fit")
+            and int(r.get("score") or 0) >= req.min_score
+        ]
+        new.sort(key=lambda r: -int(r.get("score") or 0))
+        tracked = shared_store.list_opportunities(statuses=["saved", "applying"])
+        return weekly_email(req.company, new, upcoming_deadlines(tracked, today, 45), today)
+
     # --- application pipeline ------------------------------------------------
-    @app.get("/api/pipeline", dependencies=[Depends(check_token)])
+    # Pipeline actions are cheap (no AI or search calls), so guests can try them too.
+    @app.get("/api/pipeline", dependencies=[Depends(access)])
     def pipeline() -> list[dict[str, Any]]:
         return shared_store.list_opportunities(statuses=TRACKED)
 
-    @app.put("/api/pipeline/{key}", dependencies=[Depends(check_token)])
+    @app.put("/api/pipeline/{key}", dependencies=[Depends(access)])
     def update_pipeline(key: str, body: PipelineUpdate) -> dict[str, Any]:
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         if body.record is not None:
@@ -270,7 +432,7 @@ def create_app(
             raise HTTPException(404, "Opportunity not tracked yet: send `record` the first time")
         return {"key": key, "status": body.status}
 
-    @app.get("/api/pipeline.ics", dependencies=[Depends(check_token)])
+    @app.get("/api/pipeline.ics", dependencies=[Depends(access)])
     def pipeline_calendar() -> Response:
         records = shared_store.list_opportunities(statuses=["saved", "applying"])
         return Response(
@@ -279,7 +441,7 @@ def create_app(
             headers={"Content-Disposition": 'attachment; filename="funding-deadlines.ics"'},
         )
 
-    @app.get("/api/pipeline.csv", dependencies=[Depends(check_token)])
+    @app.get("/api/pipeline.csv", dependencies=[Depends(access)])
     def pipeline_csv() -> Response:
         return Response(
             to_csv(shared_store.list_opportunities(statuses=TRACKED)),
@@ -287,7 +449,7 @@ def create_app(
             headers={"Content-Disposition": 'attachment; filename="funding-pipeline.csv"'},
         )
 
-    @app.get("/api/opportunities", dependencies=[Depends(check_token)])
+    @app.get("/api/opportunities", dependencies=[Depends(access)])
     def tracked(min_score: int = 0) -> list[dict[str, Any]]:
         return shared_store.list_opportunities(min_score)
 

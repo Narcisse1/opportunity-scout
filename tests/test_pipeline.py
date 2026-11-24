@@ -124,6 +124,7 @@ def test_pipeline_rejects_bad_input():
 
 def test_download_links_accept_token_query(monkeypatch):
     monkeypatch.setenv("SCOUT_ACCESS_TOKEN", "s3cret")
+    monkeypatch.setenv("SCOUT_GUEST_ACCESS", "off")
     c = client()
     assert c.get("/api/pipeline.ics").status_code == 401
     assert c.get("/api/pipeline.ics?token=s3cret").status_code == 200

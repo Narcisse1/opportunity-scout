@@ -254,6 +254,16 @@ header.top h1 { font-size: 28px; }
 .step:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
 .step-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
 .step-icon svg { width: 21px; height: 21px; }
+.weekly { display: flex; gap: 12px; align-items: flex-start; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.weekly .step-icon { flex: none; width: 34px; height: 34px; }
+.weekly .step-icon svg { width: 18px; height: 18px; }
+.weekly b { font-size: 13.5px; }
+.weekly p { margin: 3px 0 6px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.linkbtn:hover { text-decoration: underline; }
+details.owner { margin-top: 16px; border-top: 1px solid var(--rule); padding-top: 12px; }
+details.owner summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+details.owner input { margin-top: 8px; }
 .step-n { margin-top: 14px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .step h4 { margin: 4px 0 6px; font-family: var(--serif); font-size: 17px; font-weight: 600; }
 .step p { margin: 0; color: var(--ink-2); font-size: 13.5px; }
@@ -294,14 +304,13 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
     <div class="side-foot">
       <div id="statusModel"><span class="dot"></span>Connecting…</div>
       <div id="statusSearch"></div>
-      <div style="margin-top:8px"><a href="https://github.com/Narcisse1/opportunity-scout" target="_blank" rel="noopener">Source code</a></div>
+      <div id="statusAccess"></div>
     </div>
   </nav>
 
   <main>
     <header class="top">
       <div class="grow"><h1 id="pageTitle">Discover</h1><p id="pageSub"></p></div>
-      <div id="tokenWrap" hidden style="width:220px"><input id="token" type="password" placeholder="Access token" autocomplete="off" aria-label="Access token"></div>
     </header>
 
     <div class="content">
@@ -336,6 +345,14 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
             <button class="btn primary wide" id="runOpps">Run search</button>
             <div class="working" id="oppProgress"><span class="spinner"></span><span id="oppProgressText"></span></div>
             <div id="oppAlert"></div>
+            <div class="weekly">
+              <div class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
+              <div>
+                <b>Weekly email</b>
+                <p>Every Monday an n8n workflow runs this search and emails the new programs that fit, plus upcoming deadlines.</p>
+                <button class="linkbtn" id="oppEmail">Preview this week's email</button>
+              </div>
+            </div>
           </div>
           <div>
             <div class="summary" id="oppStats" hidden></div>
@@ -401,6 +418,11 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
             <div class="hint" id="meterText"></div>
             <ul id="meterTips" class="hint" style="padding-left:18px;margin-bottom:0"></ul>
             <p class="hint" style="margin-top:14px">Saved in this browser only.</p>
+            <details class="owner">
+              <summary>Owner access</summary>
+              <p class="hint">Visitors can use the app freely with a daily allowance of live searches. Enter the owner key to remove the limit.</p>
+              <input id="token" type="password" placeholder="Owner key" autocomplete="off" aria-label="Owner key">
+            </details>
             </div>
           </div>
           <div class="panel panel-pad">
@@ -517,7 +539,7 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
   // ------------------------------------------------------------------ API
   const token = () => $("token").value.trim();
   $("token").value = ls.get("token", "");
-  $("token").addEventListener("change", () => { ls.set("token", token()); refreshLinks(); loadPipeline(); });
+  $("token").addEventListener("change", () => { ls.set("token", token()); refreshLinks(); loadPipeline(); checkHealth(); });
   async function api(path, { method = "GET", body } = {}) {
     const headers = { "Content-Type": "application/json" };
     if (token()) headers["X-Access-Token"] = token();
@@ -526,7 +548,7 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
     if (!res.ok) {
       const detail = typeof data.detail === "string" ? data.detail
         : Array.isArray(data.detail) ? data.detail.map((d) => `${(d.loc || []).slice(1).join(".")}: ${d.msg}`).join("; ") : res.statusText;
-      throw new Error(res.status === 401 ? "An access token is required. Enter it at the top right." : (detail || `HTTP ${res.status}`));
+      throw new Error(res.status === 401 ? `${detail || "Access denied"}. Check the owner key under Company profile → Owner access.` : (detail || `HTTP ${res.status}`));
     }
     return data;
   }
@@ -740,6 +762,7 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
       profile: p?.name ? p : DEMO, queries, min_score: Number($("minScore").value), results_per_query: Number($("perQuery").value),
       draft: $("draft").checked, offline: $("oppOffline").checked,
     }, "opp", $("runOpps"));
+    checkHealth(); // refresh the guest allowance
     if (!result) return;
     lastScan = result;
     const types = [...new Set(result.opportunities.map((o) => o.type))].sort();
@@ -751,6 +774,16 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
   });
   ["oppFilter", "oppType", "oppSort", "showAll"].forEach((id) => $(id).addEventListener("input", () => lastScan && renderOpps()));
   $("oppDownload").addEventListener("click", () => lastScan && download("opportunities.md", lastScan.markdown));
+  $("oppEmail").addEventListener("click", async () => {
+    if (!lastScan) { toast("Run a search first (sample pages work too), then preview the email.", true); return; }
+    const win = window.open("", "_blank"); // open now, inside the click, so pop-up blockers allow it
+    try {
+      const email = await api("/api/digest/preview", { method: "POST", body: {
+        company: profile()?.name || DEMO.name, opportunities: lastScan.opportunities, min_score: Number($("minScore").value) } });
+      const url = URL.createObjectURL(new Blob([email.html], { type: "text/html" }));
+      if (win) win.location = url; else window.open(url, "_blank");
+    } catch (e) { if (win) win.close(); toast(e.message, true); }
+  });
 
   function renderOpps() {
     const r = lastScan;
@@ -897,8 +930,13 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
   }
 
   // ------------------------------------------------------------------ server status
-  api("/api/health").then((h) => {
-    $("tokenWrap").hidden = !h.token_required;
+  function checkHealth() { return api("/api/health").then((h) => {
+    const owner = !!token();
+    if (h.token_required && !owner) $("statusAccess").replaceChildren(el("span", { class: "dot warn" }), "Owner key required");
+    else if (h.guest_access && !owner) {
+      const left = h.guest_live_runs_left ?? 0;
+      $("statusAccess").replaceChildren(el("span", { class: "dot " + (left ? "ok" : "warn") }), `Guest: ${left} live search${left === 1 ? "" : "es"} left today`);
+    } else $("statusAccess").replaceChildren(el("span", { class: "dot ok" }), owner ? "Owner access" : "Full access");
     const model = h.llm_provider === "gemini" ? "Google Gemini" : "Anthropic Claude";
     $("statusModel").replaceChildren(el("span", { class: "dot " + (h.llm_ready ? "ok" : "bad") }), h.llm_ready ? `Model: ${model}` : `Model: no ${model} key`);
     const live = h.firecrawl || h.exa;
@@ -906,10 +944,12 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
       live ? `Search: ${[h.firecrawl && "Firecrawl", h.exa && "Exa"].filter(Boolean).join(", ")}` : "Search: sample pages only");
     if (!live) { $("oppOffline").checked = true; $("intelOffline").checked = true; $("fixtureRow").hidden = false; }
     if (!h.llm_ready) for (const id of ["oppAlert", "intelAlert"]) message(id, "err", `The server has no ${model} API key configured.`);
-  }).catch(() => $("statusModel").replaceChildren(el("span", { class: "dot bad" }), "Server unreachable"));
+  }).catch(() => $("statusModel").replaceChildren(el("span", { class: "dot bad" }), "Server unreachable")); }
+  checkHealth();
 
   refreshLinks();
-  go(ls.get("page", "discover"));
+  const fromHash = location.hash.slice(1);
+  go(fromHash in PAGES ? fromHash : ls.get("page", "discover"));
   if (ls.get("page", "discover") !== "pipeline") loadPipeline();
 })();
 </script>
