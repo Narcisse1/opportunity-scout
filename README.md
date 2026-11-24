@@ -1,7 +1,54 @@
 # Opportunity Scout
 
-**Live demo:** https://opportunity-scout-98lk.onrender.com (free tier: the first load after
-idle can take about a minute to wake up)
+**An AI research agent that finds funding programs a startup can actually win, drafts the
+applications, and emails the new ones every week.**
+
+[![Live demo](https://img.shields.io/badge/Live_demo-open_the_app-1f4e8c?style=for-the-badge)](https://opportunity-scout-98lk.onrender.com)
+[![CI](https://github.com/Narcisse1/opportunity-scout/actions/workflows/ci.yml/badge.svg)](https://github.com/Narcisse1/opportunity-scout/actions/workflows/ci.yml)
+
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?logo=googlegemini&logoColor=white)
+![Anthropic Claude](https://img.shields.io/badge/Anthropic_Claude-191919?logo=anthropic&logoColor=white)
+![Firecrawl](https://img.shields.io/badge/Firecrawl-scraping-FF6A00)
+![Exa](https://img.shields.io/badge/Exa-neural_search-1F40ED)
+![n8n](https://img.shields.io/badge/n8n-weekly_email-EA4B71?logo=n8n&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![Render](https://img.shields.io/badge/Render-46E3B7?logo=render&logoColor=black)
+
+![Opportunity Scout: the Discover page](docs/images/discover.png)
+
+**Try it:** open the [live demo](https://opportunity-scout-98lk.onrender.com), no sign-up or key
+needed. *Sample pages* mode is unlimited; live web searches are limited to a few per visitor
+per day because each one spends real API credits. (Free hosting: the first load after a
+quiet period can take about a minute.)
+
+## What this project demonstrates
+
+- **AI agent pipeline**: search → read → extract → check eligibility → score → draft, with every
+  model call returning a validated, typed object (structured outputs, no free-text parsing).
+- **Multi-provider LLM layer**: Google Gemini and Anthropic Claude behind one interface, with
+  automatic model fallback when a quota or overload error hits.
+- **Web data at scale**: Firecrawl and Exa combined, with fallbacks, de-duplication and
+  skipping of login-only sites.
+- **Workflow automation**: an n8n workflow turns the API into a weekly Gmail digest.
+- **Safety and cost control**: prompt-injection hygiene, grounding checks on every competitor
+  claim, guest rate limits, and zero LLM calls when nothing changed.
+- **Production basics**: FastAPI with background jobs, SQLite state, Docker deployment on
+  Render, 76 offline tests and CI on GitHub Actions, plus a labeled evaluation set.
+
+## Built with
+
+| Tool | Role in the project |
+|---|---|
+| **Google Gemini** / **Anthropic Claude** | The reasoning layer: extracts programs from pages, scores fit, checks eligibility, drafts answers, writes the competitor briefing. Switch with `LLM_PROVIDER`. |
+| **[Firecrawl](https://firecrawl.dev)** | Web search plus scraping of each result into clean Markdown, so the model reads the whole program page rather than a snippet. |
+| **[Exa](https://exa.ai)** | Neural search that finds program pages by meaning; also the fallback fetcher when a page can't be scraped. |
+| **[n8n](https://n8n.io)** | Runs the weekly email: every Monday it calls the Scout API, then sends the digest through Gmail ([workflow](n8n/weekly-opportunities-email.json)). |
+| **FastAPI** | Web API with background jobs, guest limits and the email digest endpoint. |
+| **SQLite** | Memory between runs: pages already reviewed, tracked applications, competitor page snapshots. |
+| **Docker + Render** | Deployment; **GitHub Actions** runs lint and tests on every push. |
 
 ## The problem
 
@@ -28,9 +75,40 @@ weekly routine:
    reminder, or to CSV.
 6. **Watches competitors**: diffs their pricing/changelog pages, reads the news, and writes a
    weekly briefing in which every claim quotes its source.
+7. **Emails you every Monday** (n8n + Gmail): only programs that are new since last week and
+   fit the profile, plus the deadlines coming up in your pipeline.
 
-Use it from the **web app**, the **CLI**, or on a **schedule** (GitHub Actions). Reports
-also export to **Obsidian** and **Notion**.
+Use it from the **web app**, the **CLI**, by **email** (n8n), or on a **schedule** (GitHub
+Actions). Reports also export to **Obsidian** and **Notion**.
+
+## Screenshots
+
+| Company profile (the facts used for eligibility and drafts) | Competitor tracking |
+|---|---|
+| ![Company profile](docs/images/profile.png) | ![Competitors](docs/images/competitors.png) |
+
+## Weekly email with n8n
+
+```mermaid
+flowchart LR
+  T[n8n schedule<br/>Monday 07:00] --> H[HTTP POST<br/>/api/digest/weekly]
+  H --> S[Scout: Firecrawl + Exa search<br/>skip pages seen before]
+  S --> L[Gemini / Claude:<br/>extract, check eligibility, score]
+  L --> E[Email HTML: new programs<br/>+ upcoming deadlines]
+  E --> I{Anything to report?}
+  I -- yes --> G[Gmail: send to the team]
+```
+
+1. Import [`n8n/weekly-opportunities-email.json`](n8n/weekly-opportunities-email.json) into n8n
+   (the SDK source is next to it).
+2. On **Run weekly scan**, create a *Custom Auth* credential that sends the header
+   `X-Access-Token: <SCOUT_ACCESS_TOKEN>`. Edit the profile and queries in the JSON body to
+   choose which opportunities you hear about.
+3. On **Send weekly email**, connect Gmail and set the recipients, then activate.
+
+Because the scan remembers the pages it has already reviewed, each email contains only
+programs that are new that week. `POST /api/digest/preview` renders the same email from
+results already on screen (the *Preview this week's email* link in the app).
 
 ## Web app
 
@@ -57,8 +135,14 @@ background jobs (`POST /api/opportunities/scan`, `POST /api/intel/run`, then pol
 
 **Deploy:** the `Dockerfile` serves the app on `$PORT` (Render, Railway, Fly.io). Set an LLM
 key (`GEMINI_API_KEY` or `ANTHROPIC_API_KEY`), `FIRECRAWL_API_KEY` and/or `EXA_API_KEY`, and
-`SCOUT_ACCESS_TOKEN`. The deployment is a single shared workspace (one team's pipeline),
-protected by that token so only people you give it to can use your API credits.
+`SCOUT_ACCESS_TOKEN`.
+
+**Access model.** Anyone can open the app and use it as a guest: sample-page runs are
+unlimited, and live web searches are capped (`SCOUT_GUEST_RUNS_PER_VISITOR`, default 3 a day;
+`SCOUT_GUEST_RUNS_PER_DAY`, default 25 in total) and run smaller (3 queries × 3 pages), so
+visitors can't drain the API budget. The owner enters `SCOUT_ACCESS_TOKEN` under *Company
+profile → Owner access* to lift the limits; the weekly digest endpoint is owner-only. Set
+`SCOUT_GUEST_ACCESS=off` to require the token for everything.
 
 ```mermaid
 flowchart LR
@@ -80,6 +164,7 @@ flowchart LR
   end
   W --> O[(SQLite state)] --> M[Obsidian / Notion]
   B --> M
+  O --> N[n8n weekly email via Gmail]
 ```
 
 ## Where the AI is
@@ -98,7 +183,7 @@ parses free text. Two providers sit behind the same interface:
 | `LLM_PROVIDER` | Key | Default model | How structured output works |
 |---|---|---|---|
 | `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-5-5` | `messages.parse()` + refusal fallbacks on supported models |
-| `gemini` | `GEMINI_API_KEY` | `gemini-flash-latest` | `response_schema` JSON mode, with retry/backoff for free-tier rate limits |
+| `gemini` | `GEMINI_API_KEY` | best available Flash model (auto-discovered) | `response_schema` JSON mode; rotates to another model on quota or overload errors |
 
 Override the model with `SCOUT_MODEL` (e.g. `claude-haiku-5-5` for low-cost runs). Cost
 estimates use each model's own prices. Refusals and safety blocks raise the same typed errors
@@ -184,7 +269,10 @@ scout/
   cli.py            `scout` command
   web.py            FastAPI app: background jobs, pipeline API, exports
   exports.py        iCalendar (RFC 5545) and CSV exports of the pipeline
+  emails.py         weekly email digest (HTML + text, scraped text escaped)
   static/index.html single-page UI (no build step)
+n8n/                weekly email workflow (importable JSON + SDK source)
+docs/images/        screenshots
 tests/              offline tests (fake LLM, mocked HTTP)
 evals/              labeled cases + eval runner
 .github/workflows/  CI (ruff + pytest) and the scheduled run
