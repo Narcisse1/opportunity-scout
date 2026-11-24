@@ -47,8 +47,8 @@ uv run scout web          # http://127.0.0.1:8000
 
 The app opens with **Ekang Agritech**, a fictional demo company (a pre-seed crop-disease
 diagnosis startup in Cameroon), so it can be tried immediately. Replace it with your own
-company on the profile page; the profile is stored in your browser only. Photography by Richard
-Nyoni and Hendrik Morkel via [Unsplash](https://unsplash.com).
+company on the profile page; the profile is stored in your browser only. Photography by
+Christina @ wocintechchat.com and Bernd Dittrich via [Unsplash](https://unsplash.com).
 
 **Sample pages** mode runs on bundled pages, so it works without web-search keys. Scans run as
 background jobs (`POST /api/opportunities/scan`, `POST /api/intel/run`, then poll
