@@ -302,8 +302,7 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
       <button data-page="profile"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/></svg>Company profile</span></button>
     </div>
     <div class="side-foot">
-      <div id="statusModel"><span class="dot"></span>Connecting…</div>
-      <div id="statusSearch"></div>
+      <div id="statusSearch"><span class="dot"></span>Connecting…</div>
       <div id="statusAccess"></div>
     </div>
   </nav>
@@ -938,13 +937,12 @@ table.grid tr.group td { font-size: 13px; letter-spacing: .02em; }
       $("statusAccess").replaceChildren(el("span", { class: "dot " + (left ? "ok" : "warn") }), `Guest: ${left} live search${left === 1 ? "" : "es"} left today`);
     } else $("statusAccess").replaceChildren(el("span", { class: "dot ok" }), owner ? "Owner access" : "Full access");
     const model = h.llm_provider === "gemini" ? "Google Gemini" : "Anthropic Claude";
-    $("statusModel").replaceChildren(el("span", { class: "dot " + (h.llm_ready ? "ok" : "bad") }), h.llm_ready ? `Model: ${model}` : `Model: no ${model} key`);
     const live = h.firecrawl || h.exa;
     $("statusSearch").replaceChildren(el("span", { class: "dot " + (live ? "ok" : "warn") }),
       live ? `Search: ${[h.firecrawl && "Firecrawl", h.exa && "Exa"].filter(Boolean).join(", ")}` : "Search: sample pages only");
     if (!live) { $("oppOffline").checked = true; $("intelOffline").checked = true; $("fixtureRow").hidden = false; }
     if (!h.llm_ready) for (const id of ["oppAlert", "intelAlert"]) message(id, "err", `The server has no ${model} API key configured.`);
-  }).catch(() => $("statusModel").replaceChildren(el("span", { class: "dot bad" }), "Server unreachable")); }
+  }).catch(() => $("statusSearch").replaceChildren(el("span", { class: "dot bad" }), "Server unreachable")); }
   checkHealth();
 
   refreshLinks();
