@@ -1,5 +1,6 @@
 // n8n Workflow SDK source for "Opportunity Scout: weekly email".
-// Every Monday 07:00: run a live scan through the Scout API, then email the result with Gmail.
+// Every Monday 07:00: wake the Scout app, run a live scan through its API, then email the result with Gmail.
+// The email also goes out when the scan reports errors, so a broken week is never silent.
 // Edit the profile and queries in "Run weekly scan" to change which opportunities are tracked.
 import { workflow, node, trigger, ifElse, newCredential, placeholder, expr } from '@n8n/workflow-sdk';
 
@@ -36,6 +37,25 @@ const weekly = trigger({
   },
 });
 
+const wake = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.2,
+  config: {
+    name: 'Wake Scout up',
+    parameters: { url: 'https://opportunity-scout-98lk.onrender.com/api/health', options: { timeout: 120000 } },
+    onError: 'continueRegularOutput',
+    retryOnFail: true,
+    maxTries: 3,
+    waitBetweenTries: 5000,
+  },
+});
+
+const pause = node({
+  type: 'n8n-nodes-base.wait',
+  version: 1.1,
+  config: { name: 'Give it a minute', parameters: { amount: 60 } },
+});
+
 const scan = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.2,
@@ -45,15 +65,15 @@ const scan = node({
       method: 'POST',
       url: 'https://opportunity-scout-98lk.onrender.com/api/digest/weekly',
       authentication: 'genericCredentialType',
-      genericAuthType: 'httpTemplatedCustomAuth',
+      genericAuthType: 'httpHeaderAuth',
       sendBody: true,
       specifyBody: 'json',
       jsonBody: JSON.stringify(body, null, 2),
       options: { timeout: 600000 },
     },
-    credentials: { httpTemplatedCustomAuth: newCredential('Scout owner key') },
+    credentials: { httpHeaderAuth: newCredential('Scout owner token (header X-Access-Token)') },
     retryOnFail: true,
-    maxTries: 2,
+    maxTries: 3,
     waitBetweenTries: 5000,
   },
 });
@@ -67,7 +87,7 @@ const anything = ifElse({
         options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
         conditions: [
           {
-            leftValue: expr('{{ $json.new_count + $json.upcoming_count }}'),
+            leftValue: expr('{{ $json.new_count + $json.upcoming_count + ($json.errors || []).length }}'),
             operator: { type: 'number', operation: 'gt' },
             rightValue: 0,
           },
@@ -98,5 +118,7 @@ const email = node({
 
 export default workflow('opportunity-scout-weekly-email', 'Opportunity Scout: weekly email')
   .add(weekly)
+  .to(wake)
+  .to(pause)
   .to(scan)
   .to(anything.onTrue(email));

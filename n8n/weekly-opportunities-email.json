@@ -9,63 +9,90 @@
       "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 7 * * 1" }] } }
     },
     {
-      "name": "Run weekly scan",
+      "name": "Wake Scout up",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [224, 0],
       "parameters": {
+        "url": "https://YOUR-SCOUT-HOST/api/health",
+        "options": { "timeout": 120000 }
+      },
+      "notes": "Free hosting plans sleep when idle; this request starts the app before the scan runs.",
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "name": "Give it a minute",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [448, 0],
+      "parameters": { "amount": 60 }
+    },
+    {
+      "name": "Run weekly scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [672, 0],
+      "parameters": {
         "method": "POST",
-        "url": "https://opportunity-scout-98lk.onrender.com/api/digest/weekly",
+        "url": "https://YOUR-SCOUT-HOST/api/digest/weekly",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpTemplatedCustomAuth",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\n  \"profile\": {\n    \"name\": \"Ekang Agritech\",\n    \"one_liner\": \"Smartphone crop-disease diagnosis for smallholder farmers in Cameroon\",\n    \"stage\": \"pre-seed\",\n    \"sectors\": [\"agritech\", \"AI\", \"climate\"],\n    \"country\": \"Cameroon\",\n    \"regions_served\": [\"Cameroon\", \"Central Africa\"],\n    \"goals\": [\"Non-dilutive funding to extend the pilot\", \"Cloud and AI API credits\"],\n    \"exclude_keywords\": [\"crypto\", \"token sale\"]\n  },\n  \"queries\": [\n    \"agritech grants Africa 2027 applications open\",\n    \"pre-seed accelerator Africa AI startups 2027\",\n    \"startup competition Cameroon 2027\"\n  ],\n  \"min_score\": 60,\n  \"results_per_query\": 4,\n  \"deadline_window_days\": 45,\n  \"app_url\": \"https://opportunity-scout-98lk.onrender.com\"\n}",
+        "jsonBody": "{\n  \"profile\": {\n    \"name\": \"Ekang Agritech\",\n    \"one_liner\": \"Smartphone crop-disease diagnosis for smallholder farmers in Cameroon\",\n    \"stage\": \"pre-seed\",\n    \"sectors\": [\"agritech\", \"AI\", \"climate\"],\n    \"country\": \"Cameroon\",\n    \"regions_served\": [\"Cameroon\", \"Central Africa\"],\n    \"goals\": [\"Non-dilutive funding to extend the pilot\", \"Cloud and AI API credits\"],\n    \"exclude_keywords\": [\"crypto\", \"token sale\"]\n  },\n  \"queries\": [\n    \"agritech grants Africa 2027 applications open\",\n    \"pre-seed accelerator Africa AI startups 2027\",\n    \"startup competition Cameroon 2027\"\n  ],\n  \"min_score\": 60,\n  \"results_per_query\": 4,\n  \"deadline_window_days\": 45,\n  \"app_url\": \"https://YOUR-SCOUT-HOST\"\n}",
         "options": { "timeout": 600000 }
       },
       "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 5000
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": { "httpHeaderAuth": { "id": "", "name": "Scout owner token (header X-Access-Token)" } }
     },
     {
       "name": "Anything to report?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [448, 0],
+      "position": [896, 0],
+      "notes": "Also true when the scan reports errors, so a broken week is never silent.",
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 1 },
           "conditions": [
             {
-              "leftValue": "={{ $json.new_count + $json.upcoming_count }}",
+              "leftValue": "={{ $json.new_count + $json.upcoming_count + ($json.errors || []).length }}",
               "operator": { "type": "number", "operation": "gt" },
               "rightValue": 0
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       }
     },
     {
       "name": "Send weekly email",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [672, 0],
+      "position": [1120, 0],
       "parameters": {
-        "resource": "message",
-        "operation": "send",
         "sendTo": "you@example.com",
         "subject": "={{ $json.subject }}",
         "emailType": "html",
         "message": "={{ $json.html }}",
         "options": { "appendAttribution": false, "senderName": "Opportunity Scout" }
-      }
+      },
+      "credentials": { "gmailOAuth2": { "id": "", "name": "Gmail account" } }
     }
   ],
   "connections": {
-    "Every Monday 07:00": { "main": [[{ "node": "Run weekly scan", "type": "main", "index": 0 }]] },
+    "Every Monday 07:00": { "main": [[{ "node": "Wake Scout up", "type": "main", "index": 0 }]] },
+    "Wake Scout up": { "main": [[{ "node": "Give it a minute", "type": "main", "index": 0 }]] },
+    "Give it a minute": { "main": [[{ "node": "Run weekly scan", "type": "main", "index": 0 }]] },
     "Run weekly scan": { "main": [[{ "node": "Anything to report?", "type": "main", "index": 0 }]] },
     "Anything to report?": { "main": [[{ "node": "Send weekly email", "type": "main", "index": 0 }]] }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": { "executionOrder": "v1", "timezone": "Africa/Douala" },
+  "active": false
 }

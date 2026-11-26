@@ -101,10 +101,15 @@ flowchart LR
 
 1. Import [`n8n/weekly-opportunities-email.json`](n8n/weekly-opportunities-email.json) into n8n
    (the SDK source is next to it).
-2. On **Run weekly scan**, create a *Custom Auth* credential that sends the header
-   `X-Access-Token: <SCOUT_ACCESS_TOKEN>`. Edit the profile and queries in the JSON body to
+2. Replace `YOUR-SCOUT-HOST` with your deployment's address.
+3. On **Run weekly scan**, create a *Header Auth* credential with name `X-Access-Token` and
+   your `SCOUT_ACCESS_TOKEN` as the value. Edit the profile and queries in the JSON body to
    choose which opportunities you hear about.
-3. On **Send weekly email**, connect Gmail and set the recipients, then activate.
+4. On **Send weekly email**, connect Gmail and set the recipients, then publish.
+
+The workflow first wakes the app (free hosting sleeps when idle) and waits a minute before
+scanning. An email is sent when there are new programs or upcoming deadlines, and also when
+the scan reports errors, so a broken week is never silent.
 
 Because the scan remembers the pages it has already reviewed, each email contains only
 programs that are new that week. `POST /api/digest/preview` renders the same email from
