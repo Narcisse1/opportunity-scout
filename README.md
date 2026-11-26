@@ -99,6 +99,15 @@ flowchart LR
   I -- yes --> G[Gmail: send to the team]
 ```
 
+The live workflow in n8n, after a successful run:
+
+![n8n workflow: wake the app, wait, run the weekly scan, check for results, send with Gmail](docs/images/n8n-weekly-email.png)
+
+The email it sent: each program is ranked by fit, with the reasons it matches the company
+profile, the deadline and a link to the program page.
+
+![Weekly email: 3 new funding programs for Ekang Agritech](docs/images/weekly-email.png)
+
 1. Import [`n8n/weekly-opportunities-email.json`](n8n/weekly-opportunities-email.json) into n8n
    (the SDK source is next to it).
 2. Replace `YOUR-SCOUT-HOST` with your deployment's address.
